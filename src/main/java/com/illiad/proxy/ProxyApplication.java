@@ -20,8 +20,8 @@ public class ProxyApplication {
 		System.err.println("Proxying *:" + LOCAL_PORT + " to " + REMOTE_HOST + ':' + REMOTE_PORT + " ...");
 
 		// Configure the bootstrap.
-		EventLoopGroup bossGroup = new NioEventLoopGroup();
-		EventLoopGroup workerGroup = new NioEventLoopGroup();
+		EventLoopGroup bossGroup = new NioEventLoopGroup(3);
+		EventLoopGroup workerGroup = new NioEventLoopGroup(4);
 		try {
 			ServerBootstrap b = new ServerBootstrap();
 			b.group(bossGroup, workerGroup)
