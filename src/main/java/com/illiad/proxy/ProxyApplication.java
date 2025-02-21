@@ -32,7 +32,7 @@ public class ProxyApplication {
 			b.group(bossGroup, workerGroup)
 					.channel(NioServerSocketChannel.class)
 					.handler(new LoggingHandler(LogLevel.INFO))
-					.childHandler(new Initializer(params))
+					.childHandler(new Initializer())
 					.bind(params.localPort).sync().channel().closeFuture().sync();
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
