@@ -33,7 +33,6 @@ public class ProxyApplication {
 					.channel(NioServerSocketChannel.class)
 					.handler(new LoggingHandler(LogLevel.INFO))
 					.childHandler(new Initializer(params))
-					.childOption(ChannelOption.AUTO_READ, false)
 					.bind(params.localPort).sync().channel().closeFuture().sync();
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
