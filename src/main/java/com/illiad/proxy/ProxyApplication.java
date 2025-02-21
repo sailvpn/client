@@ -7,18 +7,23 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 public class ProxyApplication {
 
-	static final int LOCAL_PORT = Integer.parseInt(System.getProperty("localPort", "8443"));
-	static final String REMOTE_HOST = System.getProperty("remoteHost", "www.google.com");
-	static final int REMOTE_PORT = Integer.parseInt(System.getProperty("remotePort", "443"));
+	@Autowired
+	Params params;
 
-	public static void main(String[] args) throws Exception {
-		System.err.println("Proxying *:" + LOCAL_PORT + " to " + REMOTE_HOST + ':' + REMOTE_PORT + " ...");
+	public static void main(String[] args) {
+		SpringApplication.run(ProxyApplication.class, args);
+	}
 
+	@PostConstruct
+	void postConstruct() {
 		// Configure the bootstrap.
 		EventLoopGroup bossGroup = new NioEventLoopGroup(3);
 		EventLoopGroup workerGroup = new NioEventLoopGroup(4);
@@ -27,12 +32,15 @@ public class ProxyApplication {
 			b.group(bossGroup, workerGroup)
 					.channel(NioServerSocketChannel.class)
 					.handler(new LoggingHandler(LogLevel.INFO))
-					.childHandler(new HexDumpProxyInitializer(REMOTE_HOST, REMOTE_PORT))
+					.childHandler(new Initializer(params))
 					.childOption(ChannelOption.AUTO_READ, false)
-					.bind(LOCAL_PORT).sync().channel().closeFuture().sync();
+					.bind(params.localPort).sync().channel().closeFuture().sync();
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
 		} finally {
 			bossGroup.shutdownGracefully();
 			workerGroup.shutdownGracefully();
 		}
 	}
+
 }

@@ -13,7 +13,7 @@ public class BackEndHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
         if (!inboundChannel.isActive()) {
-            HexDumpProxyFrontendHandler.closeOnFlush(ctx.channel());
+            FrontEndHandler.closeOnFlush(ctx.channel());
         } else {
             ctx.read();
         }
@@ -35,12 +35,12 @@ public class BackEndHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
-        HexDumpProxyFrontendHandler.closeOnFlush(inboundChannel);
+        FrontEndHandler.closeOnFlush(inboundChannel);
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         cause.printStackTrace();
-        HexDumpProxyFrontendHandler.closeOnFlush(ctx.channel());
+        FrontEndHandler.closeOnFlush(ctx.channel());
     }
 }

@@ -2,19 +2,19 @@ package com.illiad.proxy;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
+import io.netty.handler.codec.socksx.SocksMessage;
+import io.netty.channel.SimpleChannelInboundHandler;
 
-public class FrontEndHandler extends ChannelInboundHandlerAdapter {
+public class FrontEndHandler extends SimpleChannelInboundHandler<SocksMessage> {
 
-    private final String remoteHost;
-    private final int remotePort;
+    private Params params;
 
     // As we use inboundChannel.eventLoop() when building the Bootstrap this does not need to be volatile as
     // the outboundChannel will use the same EventLoop (and therefore Thread) as the inboundChannel.
     private Channel outboundChannel;
 
-    public FrontEndHandler(String remoteHost, int remotePort) {
-        this.remoteHost = remoteHost;
-        this.remotePort = remotePort;
+    public FrontEndHandler(Params params) {
+        this.params = params;
     }
 
     @Override
@@ -27,7 +27,7 @@ public class FrontEndHandler extends ChannelInboundHandlerAdapter {
                 .channel(ctx.channel().getClass())
                 .handler(new BackEndHandler(inboundChannel))
                 .option(ChannelOption.AUTO_READ, false);
-        ChannelFuture f = b.connect(remoteHost, remotePort);
+        ChannelFuture f = b.connect(params.remoteHost, params.remotePort);
         outboundChannel = f.channel();
         f.addListener(new ChannelFutureListener() {
             @Override
@@ -58,6 +58,11 @@ public class FrontEndHandler extends ChannelInboundHandlerAdapter {
                 }
             });
         }
+    }
+
+    @Override
+    protected void channelRead0(ChannelHandlerContext channelHandlerContext, SocksMessage socksMessage) throws Exception {
+
     }
 
     @Override

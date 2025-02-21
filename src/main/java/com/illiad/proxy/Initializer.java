@@ -2,23 +2,23 @@ package com.illiad.proxy;
 
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.codec.socksx.SocksPortUnificationServerHandler;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 
 public class Initializer extends ChannelInitializer<SocketChannel> {
 
-    private final String remoteHost;
-    private final int remotePort;
+    Params params;
 
-    public Initializer(String remoteHost, int remotePort) {
-        this.remoteHost = remoteHost;
-        this.remotePort = remotePort;
+    public Initializer(Params params) {
+        this.params = params;
     }
 
     @Override
     public void initChannel(SocketChannel ch) {
         ch.pipeline().addLast(
                 new LoggingHandler(LogLevel.INFO),
-                new FrontEndHandler(remoteHost, remotePort));
+                new SocksPortUnificationServerHandler(),
+                new FrontEndHandler(params));
     }
 }
