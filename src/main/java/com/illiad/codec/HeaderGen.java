@@ -8,10 +8,9 @@ import java.util.Random;
 @Component
 public class HeaderGen {
     private Params params;
-    private Random random;
+    private final Random random;
 
     public HeaderGen(Params params){
-
         this.random = new Random();
     }
 
