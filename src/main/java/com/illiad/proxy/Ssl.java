@@ -1,5 +1,6 @@
 package com.illiad.proxy;
 
+import io.netty.channel.ChannelHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Component;
 import javax.net.ssl.SSLException;
 
 @Component
+@ChannelHandler.Sharable
 public class Ssl {
 
     // Configure SSL.
