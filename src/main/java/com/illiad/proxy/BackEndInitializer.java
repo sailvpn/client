@@ -22,7 +22,7 @@ public class BackEndInitializer extends ChannelInitializer<SocketChannel> {
         // and accept any invalid certificates in the client side.
         // You will need something more complicated to identify both
         // and server in the real world.
-        pipeline.addFirst(ssl.sslCtx.newHandler(ch.alloc(), params.remoteHost, params.remotePort));
+        pipeline.addLast(ssl.sslCtx.newHandler(ch.alloc(), params.remoteHost, params.remotePort));
 
         // On top of the SSL handler, add the text line codec.
 
