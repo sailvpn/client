@@ -11,9 +11,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class Starter {
 
-    private Params params;
-    private Initializer initializer;
-
     public Starter(Params params, Initializer initializer) {
         // Configure the bootstrap.
         EventLoopGroup bossGroup = new NioEventLoopGroup(3);
