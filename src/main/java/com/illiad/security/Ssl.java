@@ -1,4 +1,4 @@
-package com.illiad.proxy;
+package com.illiad.security;
 
 import io.netty.channel.ChannelHandler;
 import io.netty.handler.ssl.SslContext;
