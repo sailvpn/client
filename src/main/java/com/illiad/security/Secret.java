@@ -1,6 +1,6 @@
 package com.illiad.security;
 
-import com.illiad.proxy.Params;
+import com.illiad.config.Params;
 import lombok.Getter;
 import org.springframework.stereotype.Component;
 

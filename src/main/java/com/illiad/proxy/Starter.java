@@ -1,5 +1,7 @@
 package com.illiad.proxy;
 
+import com.illiad.config.Initializer;
+import com.illiad.config.Params;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -21,7 +23,7 @@ public class Starter {
                     .channel(NioServerSocketChannel.class)
                     .handler(new LoggingHandler(LogLevel.INFO))
                     .childHandler(initializer)
-                    .bind(params.localPort).sync().channel().closeFuture().sync();
+                    .bind(params.getLocalPort()).sync().channel().closeFuture().sync();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {

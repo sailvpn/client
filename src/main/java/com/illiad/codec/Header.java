@@ -1,6 +1,6 @@
 package com.illiad.codec;
 
-import com.illiad.proxy.Params;
+import com.illiad.config.Params;
 import com.illiad.security.Secret;
 import lombok.Getter;
 import org.springframework.stereotype.Component;

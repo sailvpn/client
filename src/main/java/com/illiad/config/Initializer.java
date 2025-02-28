@@ -1,5 +1,6 @@
-package com.illiad.proxy;
+package com.illiad.config;
 
+import com.illiad.handler.CommandHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.socksx.SocksPortUnificationServerHandler;

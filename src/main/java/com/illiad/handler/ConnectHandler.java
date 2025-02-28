@@ -1,5 +1,6 @@
-package com.illiad.proxy;
+package com.illiad.handler;
 
+import com.illiad.proxy.Utils;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;

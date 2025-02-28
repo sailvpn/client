@@ -1,4 +1,5 @@
-package com.illiad.proxy;
+package com.illiad.handler;
+import com.illiad.proxy.Utils;
 import io.netty.channel.*;
 import io.netty.handler.codec.socksx.SocksMessage;
 import io.netty.channel.SimpleChannelInboundHandler;

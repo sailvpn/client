@@ -1,4 +1,4 @@
-package com.illiad.proxy;
+package com.illiad.config;
 
 import com.illiad.security.Ssl;
 import io.netty.channel.ChannelInitializer;

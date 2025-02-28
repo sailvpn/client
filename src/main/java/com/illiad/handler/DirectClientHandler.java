@@ -1,4 +1,4 @@
-package com.illiad.proxy;
+package com.illiad.handler;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
