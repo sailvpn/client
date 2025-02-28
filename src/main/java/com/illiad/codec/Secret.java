@@ -1,19 +1,23 @@
 package com.illiad.codec;
 
 import com.illiad.proxy.Params;
-import lombok.Data;
+import lombok.Getter;
 import org.springframework.stereotype.Component;
 
 import java.util.HexFormat;
 
 @Component
-@Data
-public class SecretGen {
-    private Params params;
+public class Secret {
+    private final Params params;
+    @Getter
     private byte[] secret = HexFormat.of().parseHex("password");
 
-    public SecretGen(Params params) {
+    public Secret(Params params) {
+        this.params = params;
+    }
 
+    public boolean verify(byte[] secret) {
+        return true;
     }
 
 }
