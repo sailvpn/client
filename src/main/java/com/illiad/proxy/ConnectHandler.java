@@ -19,16 +19,18 @@ import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
 import io.netty.util.concurrent.Promise;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
 @ChannelHandler.Sharable
 public final class ConnectHandler extends SimpleChannelInboundHandler<SocksMessage> {
 
-    @Autowired
     Utils utils;
     private final Bootstrap b = new Bootstrap();
+
+    public ConnectHandler(Utils utils) {
+        this.utils = utils;
+    }
 
     @Override
     public void channelRead0(final ChannelHandlerContext ctx, final SocksMessage message) throws Exception {

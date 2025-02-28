@@ -5,20 +5,22 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.socksx.v4.Socks4CommandRequest;
 import io.netty.handler.codec.socksx.v4.Socks4CommandType;
 import io.netty.handler.codec.socksx.v5.*;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
 @ChannelHandler.Sharable
 public class CommandHandler extends SimpleChannelInboundHandler<SocksMessage> {
 
-    @Autowired
-    private ConnectHandler connectHandler;
-    @Autowired
-    private Utils utils;
+    private final ConnectHandler connectHandler;
+    private final Utils utils;
+
+    public CommandHandler(ConnectHandler connectHandler, Utils utils) {
+        this.connectHandler = connectHandler;
+        this.utils = utils;
+    }
 
     @Override
-    public void channelRead0(ChannelHandlerContext ctx, SocksMessage socksRequest) throws Exception {
+    public void channelRead0(ChannelHandlerContext ctx, SocksMessage socksRequest) {
         switch (socksRequest.version()) {
             case SOCKS4a:
                 Socks4CommandRequest socksV4CmdRequest = (Socks4CommandRequest) socksRequest;
