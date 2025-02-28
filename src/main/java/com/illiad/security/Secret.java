@@ -1,4 +1,4 @@
-package com.illiad.codec;
+package com.illiad.security;
 
 import com.illiad.proxy.Params;
 import lombok.Getter;
