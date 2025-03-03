@@ -1,11 +1,11 @@
 package com.illiad.handler;
 
+import com.illiad.config.Params;
 import com.illiad.proxy.Utils;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -20,17 +20,17 @@ import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
 import io.netty.util.concurrent.Promise;
-import org.springframework.stereotype.Component;
 
-@Component
-@ChannelHandler.Sharable
 public final class ConnectHandler extends SimpleChannelInboundHandler<SocksMessage> {
 
-    Utils utils;
-    private final Bootstrap b = new Bootstrap();
+    private final Params params;
+    private final Utils utils;
+    private final Bootstrap b;
 
-    public ConnectHandler(Utils utils) {
+    public ConnectHandler(Params params, Utils utils) {
+        this.params = params;
         this.utils = utils;
+        this.b = new Bootstrap();
     }
 
     @Override
