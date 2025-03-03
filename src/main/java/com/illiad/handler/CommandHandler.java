@@ -1,4 +1,5 @@
 package com.illiad.handler;
+import com.illiad.config.Params;
 import com.illiad.proxy.Utils;
 import io.netty.channel.*;
 import io.netty.handler.codec.socksx.SocksMessage;
@@ -12,11 +13,11 @@ import org.springframework.stereotype.Component;
 @ChannelHandler.Sharable
 public class CommandHandler extends SimpleChannelInboundHandler<SocksMessage> {
 
-    private final ConnectHandler connectHandler;
+    private final Params params;
     private final Utils utils;
 
-    public CommandHandler(ConnectHandler connectHandler, Utils utils) {
-        this.connectHandler = connectHandler;
+    public CommandHandler(Params params,  Utils utils) {
+        this.params = params;
         this.utils = utils;
     }
 
@@ -26,7 +27,7 @@ public class CommandHandler extends SimpleChannelInboundHandler<SocksMessage> {
             case SOCKS4a:
                 Socks4CommandRequest socksV4CmdRequest = (Socks4CommandRequest) socksRequest;
                 if (socksV4CmdRequest.type() == Socks4CommandType.CONNECT) {
-                    ctx.pipeline().addLast(connectHandler);
+                    ctx.pipeline().addLast(new ConnectHandler(params, utils));
                     ctx.pipeline().remove(this);
                     ctx.fireChannelRead(socksRequest);
                 } else {
@@ -46,7 +47,7 @@ public class CommandHandler extends SimpleChannelInboundHandler<SocksMessage> {
                 } else if (socksRequest instanceof Socks5CommandRequest) {
                     Socks5CommandRequest socks5CmdRequest = (Socks5CommandRequest) socksRequest;
                     if (socks5CmdRequest.type() == Socks5CommandType.CONNECT) {
-                        ctx.pipeline().addLast(connectHandler);
+                        ctx.pipeline().addLast(new ConnectHandler(params, utils));
                         ctx.pipeline().remove(this);
                         ctx.fireChannelRead(socksRequest);
                     } else {
