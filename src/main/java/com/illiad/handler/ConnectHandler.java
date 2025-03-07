@@ -1,148 +1,84 @@
 package com.illiad.handler;
 
+import com.illiad.codec.HeaderEncoder;
+
 import com.illiad.config.Params;
 import com.illiad.proxy.Utils;
+import com.illiad.security.Ssl;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.*;
+import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.socksx.SocksMessage;
-import io.netty.handler.codec.socksx.v4.DefaultSocks4CommandResponse;
-import io.netty.handler.codec.socksx.v4.Socks4CommandRequest;
-import io.netty.handler.codec.socksx.v4.Socks4CommandStatus;
-import io.netty.handler.codec.socksx.v5.DefaultSocks5CommandResponse;
+import io.netty.handler.codec.socksx.v4.Socks4ClientDecoder;
+import io.netty.handler.codec.socksx.v4.Socks4ClientEncoder;
+import io.netty.handler.codec.socksx.v5.Socks5ClientEncoder;
 import io.netty.handler.codec.socksx.v5.Socks5CommandRequest;
-import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.FutureListener;
-import io.netty.util.concurrent.Promise;
+import io.netty.handler.codec.socksx.v5.Socks5CommandResponseDecoder;
+import org.springframework.stereotype.Component;
 
+@Component
+@ChannelHandler.Sharable
 public final class ConnectHandler extends SimpleChannelInboundHandler<SocksMessage> {
 
+    private final Ssl ssl;
     private final Params params;
+    private final HeaderEncoder headerEncoder;
     private final Utils utils;
-    private final Bootstrap b;
 
-    public ConnectHandler(Params params, Utils utils) {
+    public ConnectHandler(Ssl ssl, Params params, HeaderEncoder headerEncoder, Utils utils) {
+
+        this.ssl = ssl;
         this.params = params;
+        this.headerEncoder = headerEncoder;
         this.utils = utils;
-        this.b = new Bootstrap();
     }
 
     @Override
-    public void channelRead0(final ChannelHandlerContext ctx, final SocksMessage message) throws Exception {
-        if (message instanceof Socks4CommandRequest) {
-            final Socks4CommandRequest request = (Socks4CommandRequest) message;
-            Promise<Channel> promise = ctx.executor().newPromise();
-            promise.addListener(
-                    new FutureListener<Channel>() {
-                        @Override
-                        public void operationComplete(final Future<Channel> future) throws Exception {
-                            final Channel outboundChannel = future.getNow();
-                            if (future.isSuccess()) {
-                                ChannelFuture responseFuture = ctx.channel().writeAndFlush(
-                                        new DefaultSocks4CommandResponse(Socks4CommandStatus.SUCCESS));
+    public void channelRead0(final ChannelHandlerContext ctx, final SocksMessage message) {
 
-                                responseFuture.addListener(new ChannelFutureListener() {
-                                    @Override
-                                    public void operationComplete(ChannelFuture channelFuture) {
-                                        ctx.pipeline().remove(ConnectHandler.this);
-                                        outboundChannel.pipeline().addLast(new RelayHandler(ctx.channel()));
-                                        ctx.pipeline().addLast(new RelayHandler(outboundChannel));
-                                    }
-                                });
-                            } else {
-                                ctx.channel().writeAndFlush(
-                                        new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED));
-                                utils.closeOnFlush(ctx.channel());
-                            }
-                        }
-                    });
-
-            final Channel inboundChannel = ctx.channel();
-            b.group(inboundChannel.eventLoop())
+        try {
+            Bootstrap b = new Bootstrap();
+            b.group(ctx.channel().eventLoop())
                     .channel(NioSocketChannel.class)
                     .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
                     .option(ChannelOption.SO_KEEPALIVE, true)
-                    .handler(new DirectClientHandler(promise));
-
-            b.connect(request.dstAddr(), request.dstPort()).addListener(new ChannelFutureListener() {
-                @Override
-                public void operationComplete(ChannelFuture future) throws Exception {
-                    if (future.isSuccess()) {
-                        // Connection established use handler provided results
-                    } else {
-                        // Close the connection if the connection attempt has failed.
-                        ctx.channel().writeAndFlush(
-                                new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED)
-                        );
-                        utils.closeOnFlush(ctx.channel());
-                    }
-                }
-            });
-        } else if (message instanceof Socks5CommandRequest) {
-            final Socks5CommandRequest request = (Socks5CommandRequest) message;
-            Promise<Channel> promise = ctx.executor().newPromise();
-            promise.addListener(
-                    new FutureListener<Channel>() {
+                    .handler(new ChannelInitializer<SocketChannel>() {
                         @Override
-                        public void operationComplete(final Future<Channel> future) throws Exception {
-                            final Channel outboundChannel = future.getNow();
-                            if (future.isSuccess()) {
-                                ChannelFuture responseFuture =
-                                        ctx.channel().writeAndFlush(new DefaultSocks5CommandResponse(
-                                                Socks5CommandStatus.SUCCESS,
-                                                request.dstAddrType(),
-                                                request.dstAddr(),
-                                                request.dstPort()));
+                        protected void initChannel(SocketChannel ch) {
+                            ChannelPipeline pipeline = ch.pipeline();
+                            // Add SSL handler first to encrypt and decrypt everything.
+                            // In this example, we use a bogus certificate in the server side
+                            // and accept any invalid certificates in the client side.
+                            // You will need something more complicated to identify both
+                            // and server in the real world.
+                            pipeline.addLast(ssl.sslCtx.newHandler(ch.alloc(), params.getRemoteHost(), params.getRemotePort()));
 
-                                responseFuture.addListener(new ChannelFutureListener() {
-                                    @Override
-                                    public void operationComplete(ChannelFuture channelFuture) {
-                                        ctx.pipeline().remove(ConnectHandler.this);
-                                        outboundChannel.pipeline().addLast(new RelayHandler(ctx.channel()));
-                                        ctx.pipeline().addLast(new RelayHandler(outboundChannel));
-                                    }
-                                });
-                            } else {
-                                ctx.channel().writeAndFlush(new DefaultSocks5CommandResponse(
-                                        Socks5CommandStatus.FAILURE, request.dstAddrType()));
-                                utils.closeOnFlush(ctx.channel());
-                            }
+                            // On top of the SSL handler, add the text line codec.
+                            // inbound decoder: standard socks5 command response or socks4 response
+                            pipeline.addLast(message instanceof Socks5CommandRequest ? new Socks5CommandResponseDecoder() : new Socks4ClientDecoder());
+                            // outbound encoder: a header followeed by standard socks5 command request (Connect or UdP)
+                            pipeline.addLast(message instanceof Socks5CommandRequest ? Socks5ClientEncoder.DEFAULT : Socks4ClientEncoder.INSTANCE);
+                            pipeline.addLast(headerEncoder);
                         }
                     });
 
-            final Channel inboundChannel = ctx.channel();
-            b.group(inboundChannel.eventLoop())
-                    .channel(NioSocketChannel.class)
-                    .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
-                    .option(ChannelOption.SO_KEEPALIVE, true)
-                    .handler(new DirectClientHandler(promise));
+            b.connect(params.getRemoteHost(), params.getRemotePort())
+                    .sync().channel()
+                    .writeAndFlush(message)
+                    .sync();
 
-            b.connect(request.dstAddr(), request.dstPort()).addListener(new ChannelFutureListener() {
-                @Override
-                public void operationComplete(ChannelFuture future) throws Exception {
-                    if (future.isSuccess()) {
-                        // Connection established use handler provided results
-                    } else {
-                        // Close the connection if the connection attempt has failed.
-                        ctx.channel().writeAndFlush(
-                                new DefaultSocks5CommandResponse(Socks5CommandStatus.FAILURE, request.dstAddrType()));
-                        utils.closeOnFlush(ctx.channel());
-                    }
-                }
-            });
-        } else {
-            ctx.close();
+            ctx.pipeline().remove(this);
+        } catch (Exception ignored) {
+
+        } finally {
+            utils.closeOnFlush(ctx.channel());
         }
+
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         utils.closeOnFlush(ctx.channel());
     }
 }
