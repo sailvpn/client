@@ -38,7 +38,6 @@ public class HeaderEncoder extends MessageToByteEncoder<SocksMessage> {
             byteBuf.writeByte((length >> 8) & 0xFF);
         }
         byteBuf.writeBytes(secret);
-        ctx.pipeline().remove(this);
     }
 
 }
