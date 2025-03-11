@@ -3,7 +3,6 @@ package com.illiad.handler;
 import com.illiad.codec.HeaderEncoder;
 
 import com.illiad.config.Params;
-import com.illiad.proxy.Utils;
 import com.illiad.security.Ssl;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;

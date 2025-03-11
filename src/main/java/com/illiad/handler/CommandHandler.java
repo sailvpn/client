@@ -1,6 +1,5 @@
 package com.illiad.handler;
 import com.illiad.config.Params;
-import com.illiad.proxy.Utils;
 import com.illiad.security.Ssl;
 import io.netty.channel.*;
 import io.netty.handler.codec.socksx.SocksMessage;

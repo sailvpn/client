@@ -1,6 +1,5 @@
 package com.illiad.handler;
 
-import com.illiad.proxy.Utils;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
