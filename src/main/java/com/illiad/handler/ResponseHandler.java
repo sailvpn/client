@@ -11,8 +11,6 @@ import io.netty.handler.codec.socksx.v4.Socks4CommandStatus;
 import io.netty.handler.codec.socksx.v5.Socks5CommandResponse;
 import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
 import io.netty.util.concurrent.Promise;
-import io.netty.util.internal.ObjectUtil;
-
 import java.util.List;
 
 public class ResponseHandler extends ByteToMessageDecoder {
@@ -25,9 +23,11 @@ public class ResponseHandler extends ByteToMessageDecoder {
 
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf byteBuf, List<Object> list) {
+        if (list == null || list.isEmpty() || list.get(0) == null || !(list.get(0) instanceof SocksMessage)) {
+            ctx.fireExceptionCaught(new Throwable("invalid response received from remote server"));
+        }
 
-        SocksMessage message = (SocksMessage) ObjectUtil.checkNotNull(ObjectUtil.checkNotNull(list, "null object list received").get(0), "null message received");
-
+        SocksMessage message = (SocksMessage)list.get(0);
         Channel frontend = promise.getNow();
         // wite response to frontend
         frontend.writeAndFlush(message).addListener(
