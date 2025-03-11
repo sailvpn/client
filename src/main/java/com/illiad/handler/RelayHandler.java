@@ -6,17 +6,15 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
-import org.springframework.beans.factory.annotation.Autowired;
 
 public final class RelayHandler extends ChannelInboundHandlerAdapter {
 
-    @Autowired
-    Utils utils;
-
     private final Channel relayChannel;
+    private final Utils utils;
 
-    public RelayHandler(Channel relayChannel) {
+    public RelayHandler(Channel relayChannel, Utils utils) {
         this.relayChannel = relayChannel;
+        this.utils = utils;
     }
 
     @Override
@@ -42,7 +40,7 @@ public final class RelayHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        cause.printStackTrace();
+        ctx.fireExceptionCaught(cause);
         ctx.close();
     }
 }
