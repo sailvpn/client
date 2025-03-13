@@ -67,7 +67,7 @@ public final class ConnectHandler extends SimpleChannelInboundHandler<SocksMessa
                             // setup Socks direct channel relay between frontend and backend
                             frontendPipeline.addLast(new RelayHandler(backend, utils));
                             backendPipeline.addLast(new RelayHandler(frontend, utils));
-                            // add SslHandler to frontpipeline
+                            // restore frontend auto read
                             ctx.channel().config().setAutoRead(true);
                             ctx.fireChannelRead(message);
                         } else {
