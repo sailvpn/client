@@ -8,12 +8,16 @@ import io.netty.handler.codec.socksx.SocksMessage;
 import org.springframework.stereotype.Component;
 
 /**
- * Encodes a client-side {@link SocksMessage} into a {@link ByteBuf}.
+ * Encodes a client-side illiad Header into a {@link ByteBuf}.
+ * an illiad header consists by a variable offset, followed by CRLF, and a variable secret, followed by CRLF.
+ * the 1 byte ahead of the offset is the length of the offset, and the 2 bytes ahead of the secret is the length of the secret.
+ * this encoder is used to encode the header into a {@link ByteBuf} before sending it to the remote server.
  */
 @Component
 @ChannelHandler.Sharable
 public class HeaderEncoder extends MessageToByteEncoder<SocksMessage> {
 
+    private final static byte[] CRLF = new byte[]{0x0D, 0x0A};
     private final Header header;
 
     public HeaderEncoder(Header header) {
@@ -26,6 +30,7 @@ public class HeaderEncoder extends MessageToByteEncoder<SocksMessage> {
         byte[] offset = header.offset();
         byteBuf.writeByte(offset.length);
         byteBuf.writeBytes(offset);
+        byteBuf.writeBytes(CRLF);
 
         // write secret into byteBuf
         byte[] secret = header.getSecret().getSecret();
@@ -38,6 +43,7 @@ public class HeaderEncoder extends MessageToByteEncoder<SocksMessage> {
             byteBuf.writeByte((length >> 8) & 0xFF);
         }
         byteBuf.writeBytes(secret);
+        byteBuf.writeBytes(CRLF);
     }
 
 }
