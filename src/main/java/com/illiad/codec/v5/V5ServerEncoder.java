@@ -7,7 +7,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.EncoderException;
 import io.netty.handler.codec.MessageToByteEncoder;
 import io.netty.handler.codec.socksx.v5.*;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.StringUtil;
 import org.springframework.stereotype.Component;
 
@@ -24,7 +23,7 @@ public class V5ServerEncoder extends MessageToByteEncoder<Socks5Message> {
     }
 
     @Override
-    protected void encode(ChannelHandlerContext ctx, Socks5Message msg, ByteBuf out) throws Exception {
+    protected void encode(ChannelHandlerContext ctx, Socks5Message msg, ByteBuf out) {
         if (msg instanceof Socks5InitialResponse) {
             encodeAuthMethodResponse((Socks5InitialResponse) msg, out);
         } else if (msg instanceof Socks5PasswordAuthResponse) {
@@ -46,7 +45,7 @@ public class V5ServerEncoder extends MessageToByteEncoder<Socks5Message> {
         out.writeByte(msg.status().byteValue());
     }
 
-    private void encodeCommandResponse(Socks5CommandResponse msg, ByteBuf out) throws Exception {
+    private void encodeCommandResponse(Socks5CommandResponse msg, ByteBuf out) {
         out.writeByte(msg.version().byteValue());
         out.writeByte(msg.status().byteValue());
         out.writeByte(0x00);
