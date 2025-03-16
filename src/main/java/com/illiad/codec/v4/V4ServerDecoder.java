@@ -66,10 +66,12 @@ public class V4ServerDecoder extends ReplayingDecoder<State> {
                     if (readableBytes > 0) {
                         out.add(in.readRetainedSlice(readableBytes));
                     }
+                    ctx.pipeline().remove(this);
                     break;
                 }
                 case FAILURE: {
                     in.skipBytes(actualReadableBytes());
+                    ctx.pipeline().remove(this);
                     break;
                 }
             }
@@ -79,19 +81,17 @@ public class V4ServerDecoder extends ReplayingDecoder<State> {
     }
 
     private void fail(List<Object> out, Exception cause) {
-        if (!(cause instanceof DecoderException)) {
-            cause = new DecoderException(cause);
-        }
-
         Socks4CommandRequest m = new DefaultSocks4CommandRequest(
                 type != null ? type : Socks4CommandType.CONNECT,
                 dstAddr != null ? dstAddr : "",
                 dstPort != 0 ? dstPort : 65535,
                 userId != null ? userId : "");
-
-        m.setDecoderResult(DecoderResult.failure(cause));
+        if (cause instanceof DecoderException) {
+            m.setDecoderResult(DecoderResult.failure(cause));
+        } else {
+            m.setDecoderResult(DecoderResult.failure(new DecoderException(cause)));
+        }
         out.add(m);
-
         checkpoint(State.FAILURE);
     }
 
