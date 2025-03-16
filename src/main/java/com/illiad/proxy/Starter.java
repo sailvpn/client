@@ -1,7 +1,7 @@
 package com.illiad.proxy;
 
 import com.illiad.config.Params;
-import com.illiad.handler.CommandHandler;
+import com.illiad.handler.VersionHandler;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
@@ -9,7 +9,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.socksx.SocksPortUnificationServerHandler;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import org.springframework.stereotype.Component;
@@ -17,7 +16,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class Starter {
 
-    public Starter(Params params, CommandHandler commandHandler) {
+    public Starter(Params params, VersionHandler versionHandler) {
         // Configure the bootstrap.
         EventLoopGroup bossGroup = new NioEventLoopGroup(3);
         EventLoopGroup workerGroup = new NioEventLoopGroup(4);
@@ -32,8 +31,7 @@ public class Starter {
                             ChannelPipeline pipeline = ch.pipeline();
                             pipeline.addLast(
                                     new LoggingHandler(LogLevel.INFO),
-                                    new SocksPortUnificationServerHandler(),
-                                    commandHandler);
+                                    versionHandler);
                         }
                     });
             b.bind(params.getLocalPort()).sync().channel().closeFuture().sync();

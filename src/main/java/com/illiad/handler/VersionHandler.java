@@ -4,6 +4,8 @@ import com.illiad.codec.v4.V4ServerDecoder;
 import com.illiad.codec.v4.V4ServerEncoder;
 import com.illiad.codec.v5.V5InitReqDecoder;
 import com.illiad.codec.v5.V5ServerEncoder;
+import com.illiad.handler.v4.V4CommandHandler;
+import com.illiad.handler.v5.V5CommandHandler;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -30,10 +32,14 @@ public class VersionHandler extends ByteToMessageDecoder {
 
     private final V4ServerEncoder v4ServerEncoder;
     private final V5ServerEncoder v5ServerEncoder;
+    private final V4CommandHandler v4CommandHandler;
+    private final V5CommandHandler v5CommandHandler;
 
-    public VersionHandler(V4ServerEncoder v4ServerEncoder, V5ServerEncoder v5ServerEncoder) {
+    public VersionHandler(V4ServerEncoder v4ServerEncoder, V4CommandHandler v4CommandHandler, V5ServerEncoder v5ServerEncoder, V5CommandHandler v5CommandHandler) {
         this.v4ServerEncoder = v4ServerEncoder;
+        this.v4CommandHandler = v4CommandHandler;
         this.v5ServerEncoder = v5ServerEncoder;
+        this.v5CommandHandler = v5CommandHandler;
     }
 
     @Override
@@ -52,11 +58,13 @@ public class VersionHandler extends ByteToMessageDecoder {
                 logKnownVersion(ctx, version);
                 p.addAfter(ctx.name(), null, v4ServerEncoder);
                 p.addAfter(ctx.name(), null, new V4ServerDecoder());
+                p.addAfter(ctx.name(), null, v4CommandHandler);
                 break;
             case SOCKS5:
                 logKnownVersion(ctx, version);
                 p.addAfter(ctx.name(), null, v5ServerEncoder);
                 p.addAfter(ctx.name(), null, new V5InitReqDecoder());
+                p.addAfter(ctx.name(), null, v5CommandHandler);
                 break;
             default:
                 logUnknownVersion(ctx, versionVal);
