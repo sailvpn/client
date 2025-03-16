@@ -15,9 +15,8 @@ import java.util.List;
 
 /**
  * Decodes a single {@link Socks5InitialRequest} from the inbound {@link ByteBuf}s.
- * On successful decode, this decoder will forward the received data to the next handler, so that
- * other handler can remove or replace this decoder later.  On failed decode, this decoder will
- * discard the received data, so that other handler closes the connection later.
+ * On successful decode, this decoder will forward the received data to the next handler, On failed decode, this decoder will
+ * discard the received data, the decoder remove itself upon exiting.
  */
 public class V5InitReqDecoder extends ReplayingDecoder<State> {
     public V5InitReqDecoder() {
@@ -50,10 +49,12 @@ public class V5InitReqDecoder extends ReplayingDecoder<State> {
                     if (readableBytes > 0) {
                         out.add(in.readRetainedSlice(readableBytes));
                     }
+                    ctx.pipeline().remove(this);
                     break;
                 }
                 case FAILURE: {
                     in.skipBytes(actualReadableBytes());
+                    ctx.pipeline().remove(this);
                     break;
                 }
             }
