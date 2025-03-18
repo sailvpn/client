@@ -23,7 +23,7 @@ public class V5CommandHandler extends SimpleChannelInboundHandler<Socks5Message>
 
         if (socksRequest instanceof Socks5InitialRequest) {
             // auth support example
-            //ctx.pipeline().addFirst(new Socks5PasswordAuthRequestDecoder());
+            //ctx.pipeline().addFirst(new V5PwdAuthReqDecoder());
             //ctx.write(new DefaultSocks5AuthMethodResponse(Socks5AuthMethod.PASSWORD));
             ctx.pipeline().addFirst(new V5CmdReqDecoder());
             ctx.write(new DefaultSocks5InitialResponse(Socks5AuthMethod.NO_AUTH));
