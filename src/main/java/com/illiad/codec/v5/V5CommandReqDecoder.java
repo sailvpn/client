@@ -25,6 +25,10 @@ public class V5CommandReqDecoder extends ReplayingDecoder<State> {
     @Autowired
     V5AddressDecoder v5AddressDecoder;
 
+    public V5CommandReqDecoder() {
+        super(State.INIT);
+    }
+
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
         try {
