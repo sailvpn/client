@@ -1,6 +1,5 @@
 package com.illiad.handler.v4;
 
-import com.illiad.handler.ConnectHandler;
 import com.illiad.handler.Utils;
 import io.netty.channel.*;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -11,10 +10,10 @@ import org.springframework.stereotype.Component;
 @Component
 @ChannelHandler.Sharable
 public class V4CommandHandler extends SimpleChannelInboundHandler<Socks4CommandRequest> {
-    private final ConnectHandler connectHandler;
+    private final V4ConnectHandler connectHandler;
     private final Utils utils;
 
-    public V4CommandHandler(ConnectHandler connectHandler, Utils utils) {
+    public V4CommandHandler(V4ConnectHandler connectHandler, Utils utils) {
         this.connectHandler = connectHandler;
         this.utils = utils;
     }
