@@ -32,6 +32,7 @@ public class V5ClientEncoder extends MessageToByteEncoder<Socks5CommandRequest> 
         out.writeByte(dstAddrType.byteValue());
         v5AddressEncoder.encodeAddress(dstAddrType, request.dstAddr(), out);
         ByteBufUtil.writeShortBE(out, request.dstPort());
+        ctx.pipeline().remove(this);
 
     }
 
