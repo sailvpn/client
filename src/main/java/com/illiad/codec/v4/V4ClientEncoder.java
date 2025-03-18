@@ -34,5 +34,6 @@ public final class V4ClientEncoder extends MessageToByteEncoder<Socks4CommandReq
             ByteBufUtil.writeAscii(out, msg.dstAddr());
             out.writeByte(0);
         }
+        ctx.pipeline().remove(this);
     }
 }

@@ -91,7 +91,7 @@ public final class V4ConnectHandler extends SimpleChannelInboundHandler<Socks4Co
                         pipeline.addLast(ssl.sslCtx.newHandler(ch.alloc(), params.getRemoteHost(), params.getRemotePort()),
                                 // backend inbound decoder: standard socks4 command response
                                 new V4ClientDecoder(),
-                                new ResponseHandler(promise),
+                                new V4AckHandler(promise),
                                 // backend outbound encoder
                                 v4ClientEncoder,
                                 // backend header encoder

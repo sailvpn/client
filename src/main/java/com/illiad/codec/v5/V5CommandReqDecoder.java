@@ -23,7 +23,7 @@ import java.util.List;
 public class V5CommandReqDecoder extends ReplayingDecoder<State> {
 
     @Autowired
-    V5AddressDecoder v5AddressDecoder;
+    private V5AddressDecoder v5AddressDecoder;
 
     public V5CommandReqDecoder() {
         super(State.INIT);
