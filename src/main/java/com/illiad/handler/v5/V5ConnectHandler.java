@@ -41,7 +41,7 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
     @Override
     public void channelRead0(final ChannelHandlerContext ctx, final Socks5CommandRequest request) {
 
-        // defind a promise to handle the connection to the remote server
+        // define a promise to handle the connection to the remote server
         Promise<Channel> promise = ctx.executor().newPromise();
         promise.addListener(
                 (FutureListener<Channel>) future -> {
