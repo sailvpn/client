@@ -8,7 +8,6 @@ import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.ReplayingDecoder;
 import io.netty.handler.codec.socksx.SocksVersion;
 import io.netty.handler.codec.socksx.v5.*;
-import io.netty.handler.codec.socksx.v5.Socks5CommandRequestDecoder.State;
 import org.springframework.beans.factory.annotation.Autowired;
 
 
@@ -44,7 +43,7 @@ public class V5CommandReqDecoder extends ReplayingDecoder<State> {
                     final int dstPort = ByteBufUtil.readUnsignedShortBE(in);
 
                     out.add(new DefaultSocks5CommandRequest(type, dstAddrType, dstAddr, dstPort));
-                    checkpoint(io.netty.handler.codec.socksx.v5.Socks5CommandRequestDecoder.State.SUCCESS);
+                    checkpoint(State.SUCCESS);
                 }
                 case SUCCESS: {
                     int readableBytes = actualReadableBytes();
@@ -66,7 +65,7 @@ public class V5CommandReqDecoder extends ReplayingDecoder<State> {
     }
 
     private void fail(List<Object> out, Exception cause) {
-        checkpoint(io.netty.handler.codec.socksx.v5.Socks5CommandRequestDecoder.State.FAILURE);
+        checkpoint(State.FAILURE);
 
         Socks5Message m = new DefaultSocks5CommandRequest(
                 Socks5CommandType.CONNECT, Socks5AddressType.IPv4, "0.0.0.0", 1);
