@@ -52,6 +52,7 @@ public class PwdAuthReqDecoder extends ReplayingDecoder<State> {
                     if (readableBytes > 0) {
                         out.add(in.readRetainedSlice(readableBytes));
                     }
+                    ctx.pipeline().remove(this);
                     break;
                 }
                 case FAILURE: {
