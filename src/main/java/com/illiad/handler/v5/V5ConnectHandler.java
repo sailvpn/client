@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @ChannelHandler.Sharable
-public final class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandRequest> {
+public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandRequest> {
 
     private final Ssl ssl;
     private final Params params;

@@ -1,7 +1,6 @@
 package com.illiad.handler.v5;
 
 import com.illiad.codec.v5.V5CommandReqDecoder;
-import com.illiad.handler.ConnectHandler;
 import com.illiad.handler.Utils;
 import io.netty.channel.*;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -11,10 +10,10 @@ import org.springframework.stereotype.Component;
 @Component
 @ChannelHandler.Sharable
 public class V5CommandHandler extends SimpleChannelInboundHandler<Socks5Message> {
-    private final ConnectHandler connectHandler;
+    private final V5ConnectHandler connectHandler;
     private final Utils utils;
 
-    public V5CommandHandler(ConnectHandler connectHandler, Utils utils) {
+    public V5CommandHandler(V5ConnectHandler connectHandler, Utils utils) {
         this.connectHandler = connectHandler;
         this.utils = utils;
     }
