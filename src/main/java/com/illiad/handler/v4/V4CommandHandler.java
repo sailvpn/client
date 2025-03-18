@@ -6,12 +6,11 @@ import io.netty.channel.*;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.socksx.v4.Socks4CommandRequest;
 import io.netty.handler.codec.socksx.v4.Socks4CommandType;
-import io.netty.handler.codec.socksx.v4.Socks4Message;
 import org.springframework.stereotype.Component;
 
 @Component
 @ChannelHandler.Sharable
-public class V4CommandHandler extends SimpleChannelInboundHandler<Socks4Message> {
+public class V4CommandHandler extends SimpleChannelInboundHandler<Socks4CommandRequest> {
     private final ConnectHandler connectHandler;
     private final Utils utils;
 
@@ -21,13 +20,12 @@ public class V4CommandHandler extends SimpleChannelInboundHandler<Socks4Message>
     }
 
     @Override
-    public void channelRead0(ChannelHandlerContext ctx, Socks4Message socksRequest) {
+    public void channelRead0(ChannelHandlerContext ctx, Socks4CommandRequest request) {
 
-        Socks4CommandRequest socksV4CmdRequest = (Socks4CommandRequest) socksRequest;
-        if (socksV4CmdRequest.type() == Socks4CommandType.CONNECT) {
+        if (request.type() == Socks4CommandType.CONNECT) {
             ctx.pipeline().addLast(connectHandler);
             ctx.pipeline().remove(this);
-            ctx.fireChannelRead(socksRequest);
+            ctx.fireChannelRead(request);
         } else {
             ctx.close();
         }
