@@ -2,8 +2,8 @@ package com.illiad.handler.v5;
 
 import com.illiad.codec.HeaderEncoder;
 
+import com.illiad.codec.v5.V5ClientDecoder;
 import com.illiad.codec.v5.V5ClientEncoder;
-import com.illiad.codec.v5.V5CmdResDecoder;
 import com.illiad.config.Params;
 import com.illiad.handler.RelayHandler;
 import com.illiad.handler.Utils;
@@ -90,7 +90,7 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         // and server in the real world.
                         pipeline.addLast(ssl.sslCtx.newHandler(ch.alloc(), params.getRemoteHost(), params.getRemotePort()),
                                 // backend inbound decoder: standard socks5 command response
-                                new V5CmdResDecoder(),
+                                new V5ClientDecoder(),
                                 new V5AckHandler(promise),
                                 // backend outbound encoder: standard socks5 command request (Connect or UdP)
                                 v5ClientEncoder,
