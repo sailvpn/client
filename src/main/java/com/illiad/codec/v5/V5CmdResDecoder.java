@@ -18,12 +18,12 @@ import java.util.List;
  * other handler can remove or replace this decoder later.  On failed decode, this decoder will
  * discard the received data, so that other handler closes the connection later.
  */
-public class V5CommandResDecoder extends ReplayingDecoder<State> {
+public class V5CmdResDecoder extends ReplayingDecoder<State> {
 
     @Autowired
     private V5AddressDecoder v5AddressDecoder;
 
-    public V5CommandResDecoder() {
+    public V5CmdResDecoder() {
         super(State.INIT);
     }
 

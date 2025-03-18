@@ -1,6 +1,6 @@
 package com.illiad.handler.v5;
 
-import com.illiad.codec.v5.V5CommandReqDecoder;
+import com.illiad.codec.v5.V5CmdReqDecoder;
 import com.illiad.handler.Utils;
 import io.netty.channel.*;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -25,7 +25,7 @@ public class V5CommandHandler extends SimpleChannelInboundHandler<Socks5Message>
             // auth support example
             //ctx.pipeline().addFirst(new Socks5PasswordAuthRequestDecoder());
             //ctx.write(new DefaultSocks5AuthMethodResponse(Socks5AuthMethod.PASSWORD));
-            ctx.pipeline().addFirst(new V5CommandReqDecoder());
+            ctx.pipeline().addFirst(new V5CmdReqDecoder());
             ctx.write(new DefaultSocks5InitialResponse(Socks5AuthMethod.NO_AUTH));
             //} else if (socksRequest instanceof Socks5PasswordAuthRequest) {
             //    ctx.pipeline().addFirst(new V5CommandReqDecoder());

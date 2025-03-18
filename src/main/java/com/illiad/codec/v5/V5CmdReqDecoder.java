@@ -20,12 +20,12 @@ import java.util.List;
  * discard the received data, so that other handler closes the connection later.
  */
 
-public class V5CommandReqDecoder extends ReplayingDecoder<State> {
+public class V5CmdReqDecoder extends ReplayingDecoder<State> {
 
     @Autowired
     private V5AddressDecoder v5AddressDecoder;
 
-    public V5CommandReqDecoder() {
+    public V5CmdReqDecoder() {
         super(State.INIT);
     }
 
