@@ -98,16 +98,13 @@ public final class ConnectHandler extends SimpleChannelInboundHandler<SocksMessa
                 });
 
         // connect to the proxy server, and forward the Socks connect command message to the remote server
-        b.connect(params.getRemoteHost(), params.getRemotePort()).addListener(new ChannelFutureListener() {
-            @Override
-            public void operationComplete(ChannelFuture future) {
-                if (future.isSuccess()) {
-                    // Connection established use handler provided results
-                } else {
-                    // Close the connection if the connection attempt has failed.
-                    utils.closeOnFlush(ctx.channel());
-                    ctx.fireExceptionCaught(future.cause());
-                }
+        b.connect(params.getRemoteHost(), params.getRemotePort()).addListener((ChannelFutureListener) future -> {
+            if (future.isSuccess()) {
+                // Connection established use handler provided results
+            } else {
+                // Close the connection if the connection attempt has failed.
+                utils.closeOnFlush(ctx.channel());
+                ctx.fireExceptionCaught(future.cause());
             }
         });
 
