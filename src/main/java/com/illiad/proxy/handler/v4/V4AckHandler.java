@@ -25,6 +25,7 @@ public class V4AckHandler extends SimpleChannelInboundHandler<Socks4CommandRespo
                 frontend.config().setAutoRead(false);
                 // trigger promise as per message status
                 if (response.status() == Socks4CommandStatus.SUCCESS) {
+                    ctx.pipeline().remove(this);
                     promise.setSuccess(ctx.channel());
                 } else {
                     promise.setFailure(new Exception(response.status().toString()));
@@ -36,6 +37,5 @@ public class V4AckHandler extends SimpleChannelInboundHandler<Socks4CommandRespo
                 ctx.fireExceptionCaught(future.cause());
             }
         });
-        ctx.pipeline().remove(this);
     }
 }

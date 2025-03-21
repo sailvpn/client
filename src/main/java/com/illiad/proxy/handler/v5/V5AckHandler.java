@@ -27,6 +27,7 @@ public class V5AckHandler extends SimpleChannelInboundHandler<Socks5CommandRespo
                 // trigger promise as per message status
 
                 if (response.status() == Socks5CommandStatus.SUCCESS) {
+                    ctx.pipeline().remove(this);
                     promise.setSuccess(ctx.channel());
                 } else {
                     promise.setFailure(new Exception(response.status().toString()));
@@ -38,7 +39,6 @@ public class V5AckHandler extends SimpleChannelInboundHandler<Socks5CommandRespo
             }
         });
 
-        ctx.pipeline().remove(this);
     }
 }
 
