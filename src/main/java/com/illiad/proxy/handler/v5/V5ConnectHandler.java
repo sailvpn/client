@@ -44,46 +44,42 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
 
         // define a promise to handle the connection to the remote server
         Promise<Channel> promise = ctx.executor().newPromise();
-        promise.addListener(
-                (FutureListener<Channel>) future -> {
-                    final Channel frontend = ctx.channel();
-                    final ChannelPipeline frontendPipeline = ctx.pipeline();
-                    final Channel backend = future.getNow();
-                    final ChannelPipeline backendPipeline = backend.pipeline();
-                    if (future.isSuccess()) {
-                        // remove all handlers except SslHandler from backendPipeline
-                        for (String name : backendPipeline.names()) {
-                            ChannelHandler handler = backendPipeline.get(name);
-                            if (handler instanceof SslHandler) {
-                                continue;
-                            }
-                            backendPipeline.remove(name);
-                        }
-
-                        // remove all handlers except LoggingHandler, V5ConnectHandler from frontendPipeline
-                        for (String name : frontendPipeline.names()) {
-                            ChannelHandler handler = backendPipeline.get(name);
-                            if (handler instanceof LoggingHandler || handler instanceof V5ConnectHandler) {
-                                continue;
-                            }
-                            frontendPipeline.remove(name);
-                        }
-
-                        // setup Socks direct channel relay between frontend and backend
-                        frontendPipeline.addLast(new RelayHandler(backend, utils));
-                        backendPipeline.addLast(new RelayHandler(frontend, utils));
-                        // restore frontend auto read
-                        frontend.config().setAutoRead(true);
-                        frontendPipeline.remove(this);
-                    } else {
-                        utils.closeOnFlush(ctx.channel());
-                        ctx.fireExceptionCaught(future.cause());
+        promise.addListener((FutureListener<Channel>) future -> {
+            final Channel frontend = ctx.channel();
+            final ChannelPipeline frontendPipeline = ctx.pipeline();
+            final Channel backend = future.getNow();
+            final ChannelPipeline backendPipeline = backend.pipeline();
+            if (future.isSuccess()) {
+                // remove all handlers except SslHandler from backendPipeline
+                for (String name : backendPipeline.names()) {
+                    ChannelHandler handler = backendPipeline.get(name);
+                    if (handler instanceof SslHandler) {
+                        continue;
                     }
+                    backendPipeline.remove(name);
                 }
-        );
 
-        b.group(ctx.channel().eventLoop())
-                .channel(NioSocketChannel.class)
+                // remove all handlers except LoggingHandler from frontendPipeline
+                for (String name : frontendPipeline.names()) {
+                    ChannelHandler handler = backendPipeline.get(name);
+                    if (handler instanceof LoggingHandler) {
+                        continue;
+                    }
+                    frontendPipeline.remove(name);
+                }
+
+                // setup Socks direct channel relay between frontend and backend
+                frontendPipeline.addLast(new RelayHandler(backend, utils));
+                backendPipeline.addLast(new RelayHandler(frontend, utils));
+                // restore frontend auto read
+                frontend.config().setAutoRead(true);
+            } else {
+                utils.closeOnFlush(ctx.channel());
+                ctx.fireExceptionCaught(future.cause());
+            }
+        });
+
+        b.group(ctx.channel().eventLoop()).channel(NioSocketChannel.class)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
                 .option(ChannelOption.SO_KEEPALIVE, true)
                 .handler(new ChannelInitializer<SocketChannel>() {
@@ -97,8 +93,7 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         // and server in the real world.
                         pipeline.addLast(ssl.sslCtx.newHandler(ch.alloc(), params.getRemoteHost(), params.getRemotePort()),
                                 // backend inbound decoder: standard socks5 command response
-                                new V5ClientDecoder(),
-                                new V5AckHandler(promise),
+                                new V5ClientDecoder(), new V5AckHandler(promise),
                                 // backend outbound encoder: standard socks5 command request (Connect or UdP)
                                 v5ClientEncoder,
                                 // illiad header
@@ -107,7 +102,8 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                 });
 
         // connect to the proxy server, and forward the Socks connect command message to the remote server
-        b.connect(params.getRemoteHost(), params.getRemotePort()).channel().writeAndFlush(request)
+        b.connect(params.getRemoteHost(), params.getRemotePort()).channel()
+                .writeAndFlush(request)
                 .addListener((ChannelFutureListener) future -> {
                     if (future.isSuccess()) {
                         // Connection established use handler provided results

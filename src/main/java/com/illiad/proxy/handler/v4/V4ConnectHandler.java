@@ -59,10 +59,10 @@ public final class V4ConnectHandler extends SimpleChannelInboundHandler<Socks4Co
                             backendPipeline.remove(name);
                         }
 
-                        // remove all handlers except LoggingHandler, V4ConnectHandler from frontendPipeline
+                        // remove all handlers except LoggingHandler from frontendPipeline
                         for (String name : frontendPipeline.names()) {
                             ChannelHandler handler = backendPipeline.get(name);
-                            if (handler instanceof LoggingHandler || handler instanceof V4ConnectHandler) {
+                            if (handler instanceof LoggingHandler) {
                                 continue;
                             }
                             frontendPipeline.remove(name);
@@ -73,7 +73,6 @@ public final class V4ConnectHandler extends SimpleChannelInboundHandler<Socks4Co
                         backendPipeline.addLast(new RelayHandler(frontend, utils));
                         // restore frontend auto read
                         frontend.config().setAutoRead(true);
-                        frontendPipeline.remove(this);
                     } else {
                         utils.closeOnFlush(frontend);
                         ctx.fireExceptionCaught(future.cause());
