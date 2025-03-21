@@ -12,6 +12,7 @@ import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.socksx.v4.Socks4CommandRequest;
+import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.concurrent.FutureListener;
 import io.netty.util.concurrent.Promise;
@@ -49,16 +50,21 @@ public final class V4ConnectHandler extends SimpleChannelInboundHandler<Socks4Co
                     final Channel backend = future.getNow();
                     final ChannelPipeline backendPipeline = backend.pipeline();
                     if (future.isSuccess()) {
-                        // remove all handlers except SslHandler from backend pipeline
+                        // remove all handlers except SslHandler from backendPipeline
                         for (String name : backendPipeline.names()) {
                             ChannelHandler handler = backendPipeline.get(name);
-                            if (!(handler instanceof SslHandler)) {
-                                backendPipeline.remove(name);
+                            if (handler instanceof SslHandler) {
+                                continue;
                             }
+                            backendPipeline.remove(name);
                         }
 
-                        // remove all handlers from frontend pipeline
+                        // remove all handlers except LoggingHandler, V4ConnectHandler from frontendPipeline
                         for (String name : frontendPipeline.names()) {
+                            ChannelHandler handler = backendPipeline.get(name);
+                            if (handler instanceof LoggingHandler || handler instanceof V4ConnectHandler) {
+                                continue;
+                            }
                             frontendPipeline.remove(name);
                         }
 
@@ -66,9 +72,10 @@ public final class V4ConnectHandler extends SimpleChannelInboundHandler<Socks4Co
                         frontendPipeline.addLast(new RelayHandler(backend, utils));
                         backendPipeline.addLast(new RelayHandler(frontend, utils));
                         // restore frontend auto read
-                        ctx.channel().config().setAutoRead(true);
+                        frontend.config().setAutoRead(true);
+                        frontendPipeline.remove(this);
                     } else {
-                        utils.closeOnFlush(ctx.channel());
+                        utils.closeOnFlush(frontend);
                         ctx.fireExceptionCaught(future.cause());
                     }
                 }
@@ -100,16 +107,13 @@ public final class V4ConnectHandler extends SimpleChannelInboundHandler<Socks4Co
 
         // connect to the proxy server, and forward the Socks connect command message to the remote server
         b.connect(params.getRemoteHost(), params.getRemotePort()).channel().writeAndFlush(request)
-                .addListener(new ChannelFutureListener() {
-                    @Override
-                    public void operationComplete(ChannelFuture future) {
-                        if (future.isSuccess()) {
-                            // Connection established use handler provided results
-                        } else {
-                            // Close the connection if the connection attempt has failed.
-                            utils.closeOnFlush(ctx.channel());
-                            ctx.fireExceptionCaught(future.cause());
-                        }
+                .addListener((ChannelFutureListener) future -> {
+                    if (future.isSuccess()) {
+                        // Connection established use handler provided results
+                    } else {
+                        // Close the connection if the connection attempt has failed.
+                        utils.closeOnFlush(ctx.channel());
+                        ctx.fireExceptionCaught(future.cause());
                     }
                 });
 

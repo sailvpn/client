@@ -13,6 +13,7 @@ import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.socksx.v5.Socks5CommandRequest;
+import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.concurrent.FutureListener;
 import io.netty.util.concurrent.Promise;
@@ -50,16 +51,21 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                     final Channel backend = future.getNow();
                     final ChannelPipeline backendPipeline = backend.pipeline();
                     if (future.isSuccess()) {
-                        // remove all handlers except SslHandler from backend pipeline
+                        // remove all handlers except SslHandler from backendPipeline
                         for (String name : backendPipeline.names()) {
                             ChannelHandler handler = backendPipeline.get(name);
-                            if (!(handler instanceof SslHandler)) {
-                                backendPipeline.remove(name);
+                            if (handler instanceof SslHandler) {
+                                continue;
                             }
+                            backendPipeline.remove(name);
                         }
 
-                        // remove all handlers from frontend pipeline
+                        // remove all handlers except LoggingHandler, V5ConnectHandler from frontendPipeline
                         for (String name : frontendPipeline.names()) {
+                            ChannelHandler handler = backendPipeline.get(name);
+                            if (handler instanceof LoggingHandler || handler instanceof V5ConnectHandler) {
+                                continue;
+                            }
                             frontendPipeline.remove(name);
                         }
 
@@ -67,7 +73,8 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         frontendPipeline.addLast(new RelayHandler(backend, utils));
                         backendPipeline.addLast(new RelayHandler(frontend, utils));
                         // restore frontend auto read
-                        ctx.channel().config().setAutoRead(true);
+                        frontend.config().setAutoRead(true);
+                        frontendPipeline.remove(this);
                     } else {
                         utils.closeOnFlush(ctx.channel());
                         ctx.fireExceptionCaught(future.cause());
