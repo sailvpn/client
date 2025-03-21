@@ -1,7 +1,7 @@
 package com.illiad.proxy;
 
-import com.illiad.config.Params;
-import com.illiad.handler.VersionHandler;
+import com.illiad.proxy.config.Params;
+import com.illiad.proxy.handler.VersionHandler;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
