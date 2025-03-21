@@ -9,8 +9,6 @@ import io.netty.handler.codec.ReplayingDecoder;
 import io.netty.handler.codec.socksx.SocksVersion;
 import io.netty.handler.codec.socksx.v5.*;
 import org.springframework.beans.factory.annotation.Autowired;
-
-
 import java.util.List;
 
 /**
