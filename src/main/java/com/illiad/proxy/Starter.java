@@ -1,7 +1,11 @@
 package com.illiad.proxy;
 
+import com.illiad.proxy.codec.v4.V4ServerEncoder;
+import com.illiad.proxy.codec.v5.V5ServerEncoder;
 import com.illiad.proxy.config.Params;
 import com.illiad.proxy.handler.VersionHandler;
+import com.illiad.proxy.handler.v4.V4CommandHandler;
+import com.illiad.proxy.handler.v5.V5CommandHandler;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
@@ -16,7 +20,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class Starter {
 
-    public Starter(Params params, VersionHandler versionHandler) {
+    public Starter(Params params, V4ServerEncoder v4ServerEncoder, V4CommandHandler v4CommandHandler, V5ServerEncoder v5ServerEncoder, V5CommandHandler v5CommandHandler) {
         // Configure the bootstrap.
         EventLoopGroup bossGroup = new NioEventLoopGroup(3);
         EventLoopGroup workerGroup = new NioEventLoopGroup(4);
@@ -31,7 +35,7 @@ public class Starter {
                             ChannelPipeline pipeline = ch.pipeline();
                             pipeline.addLast(
                                     new LoggingHandler(LogLevel.INFO),
-                                    versionHandler);
+                                    new VersionHandler(v4ServerEncoder, v4CommandHandler, v5ServerEncoder, v5CommandHandler));
                         }
                     });
             b.bind(params.getLocalPort()).sync().channel().closeFuture().sync();

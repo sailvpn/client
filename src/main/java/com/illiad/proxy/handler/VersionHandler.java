@@ -7,15 +7,12 @@ import com.illiad.proxy.codec.v5.V5ServerEncoder;
 import com.illiad.proxy.handler.v4.V4CommandHandler;
 import com.illiad.proxy.handler.v5.V5CommandHandler;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.codec.socksx.SocksVersion;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
-import org.springframework.stereotype.Component;
-
 import java.util.List;
 
 /**
@@ -23,8 +20,6 @@ import java.util.List;
  * either {@link V4ServerDecoder} or {@link V5InitReqDecoder}.
  */
 
-@Component
-@ChannelHandler.Sharable
 public class VersionHandler extends ByteToMessageDecoder {
 
     private static final InternalLogger logger =
