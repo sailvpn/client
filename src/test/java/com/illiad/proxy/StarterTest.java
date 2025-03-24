@@ -34,11 +34,11 @@ class StarterTest {
     }
 
     @Test
-    void testStarter() throws InterruptedException {
+    void testStarter() {
         Starter starter = new Starter(params, v4ServerEncoder, v4CommandHandler, v5ServerEncoder, v5CommandHandler);
 
         // Verify that the server is configured correctly
-        ArgumentCaptor<ChannelInitializer<SocketChannel>> captor = ArgumentCaptor.forClass(ChannelInitializer.class);
+        ArgumentCaptor captor = ArgumentCaptor.forClass(ChannelInitializer.class);
         verify(params).getLocalPort();
         verifyNoMoreInteractions(params, v4ServerEncoder, v4CommandHandler, v5ServerEncoder, v5CommandHandler);
     }
