@@ -1,5 +1,6 @@
 package com.illiad.proxy.codec;
 
+import com.illiad.proxy.security.Secret;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -18,9 +19,11 @@ import org.springframework.stereotype.Component;
 public class HeaderEncoder extends MessageToByteEncoder<SocksMessage> {
 
     private final static byte[] CRLF = new byte[]{0x0D, 0x0A};
+    private final Secret secret;
     private final Header header;
 
-    public HeaderEncoder(Header header) {
+    public HeaderEncoder(Secret secret, Header header) {
+        this.secret = secret;
         this.header = header;
     }
 
@@ -33,8 +36,8 @@ public class HeaderEncoder extends MessageToByteEncoder<SocksMessage> {
         byteBuf.writeBytes(CRLF);
 
         // write secret into byteBuf
-        byte[] secret = header.getSecret().getSecret();
-        int length = secret.length;
+        byte[] secretBytes = secret.getSecret();
+        int length = secretBytes.length;
         if (length < 256) {
             byteBuf.writeByte(length);
             byteBuf.writeByte(0);
@@ -42,8 +45,9 @@ public class HeaderEncoder extends MessageToByteEncoder<SocksMessage> {
             byteBuf.writeByte(length & 0xFF);
             byteBuf.writeByte((length >> 8) & 0xFF);
         }
-        byteBuf.writeBytes(secret);
+        byteBuf.writeBytes(secretBytes);
         byteBuf.writeBytes(CRLF);
     }
+
 
 }
