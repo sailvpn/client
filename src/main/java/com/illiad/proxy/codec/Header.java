@@ -1,24 +1,16 @@
 package com.illiad.proxy.codec;
 
 import com.illiad.proxy.config.Params;
-import com.illiad.proxy.security.Secret;
-import lombok.Getter;
-import org.springframework.stereotype.Component;
-
 import java.util.Random;
-
+import org.springframework.stereotype.Component;
 @Component
 public class Header {
     private final Params params;
     private final Random random;
-    @Getter
-    private final Secret secret;
 
-    public Header(Params params, Secret secret){
+    public Header(Params params){
         this.params = params;
-        this.secret = secret;
         this.random = new Random();
-
     }
 
     public byte[] offset() {
