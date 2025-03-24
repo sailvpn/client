@@ -1,5 +1,6 @@
 package com.illiad.proxy.codec;
 
+import com.illiad.proxy.security.Secret;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -11,44 +12,39 @@ import static org.mockito.Mockito.*;
 
 class HeaderEncoderTest {
 
+    private Secret secret;
     private Header header;
     private HeaderEncoder headerEncoder;
-    private ChannelHandlerContext ctx;
-    private SocksMessage socksMessage;
 
     @BeforeEach
     void setUp() {
+        secret = mock(Secret.class);
         header = mock(Header.class);
-        headerEncoder = new HeaderEncoder(header);
-        ctx = mock(ChannelHandlerContext.class);
-        socksMessage = mock(SocksMessage.class);
+        headerEncoder = new HeaderEncoder(secret, header);
     }
 
     @Test
     void testEncode() throws Exception {
-        byte[] offset = "offset".getBytes();
-        byte[] secret = "secret".getBytes();
+        ChannelHandlerContext ctx = mock(ChannelHandlerContext.class);
+        SocksMessage socksMessage = mock(SocksMessage.class);
+        ByteBuf byteBuf = Unpooled.buffer();
+
+        byte[] offset = new byte[]{0x01, 0x02, 0x03};
+        byte[] secretBytes = new byte[]{0x04, 0x05, 0x06, 0x07};
 
         when(header.offset()).thenReturn(offset);
-        when(header.getSecret().getSecret()).thenReturn(secret);
+        when(secret.getSecret()).thenReturn(secretBytes);
 
-        ByteBuf byteBuf = Unpooled.buffer();
         headerEncoder.encode(ctx, socksMessage, byteBuf);
 
-        byte[] expectedOutput = new byte[offset.length + secret.length + 6];
-        expectedOutput[0] = (byte) offset.length;
-        System.arraycopy(offset, 0, expectedOutput, 1, offset.length);
-        expectedOutput[offset.length + 1] = 0x0D;
-        expectedOutput[offset.length + 2] = 0x0A;
-        expectedOutput[offset.length + 3] = (byte) secret.length;
-        expectedOutput[offset.length + 4] = 0;
-        System.arraycopy(secret, 0, expectedOutput, offset.length + 5, secret.length);
-        expectedOutput[offset.length + secret.length + 5] = 0x0D;
-        expectedOutput[offset.length + secret.length + 6] = 0x0A;
+        byte[] expected = new byte[]{
+                0x03, 0x01, 0x02, 0x03, 0x0D, 0x0A, // offset and CRLF
+                0x04, 0x00, 0x04, 0x05, 0x06, 0x07, 0x0D, 0x0A // secret and CRLF
+        };
 
-        byte[] actualOutput = new byte[byteBuf.readableBytes()];
-        byteBuf.readBytes(actualOutput);
+        byte[] actual = new byte[byteBuf.readableBytes()];
+        byteBuf.readBytes(actual);
 
-        assertArrayEquals(expectedOutput, actualOutput);
+        assertArrayEquals(expected, actual);
     }
 }
