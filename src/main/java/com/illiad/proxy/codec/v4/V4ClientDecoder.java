@@ -43,8 +43,8 @@ public class V4ClientDecoder extends ReplayingDecoder<V4ClientDecoder.State> {
                     out.add(new DefaultSocks4CommandResponse(status, dstAddr, dstPort));
                     checkpoint(State.SUCCESS);
                 }
-                casCCESS: {
-e                            int readableBytes = actualReadableBytes();
+                case SUCCESS: {
+                    int readableBytes = actualReadableBytes();
                     if (readableBytes > 0) {
                         out.add(in.readRetainedSlice(readableBytes));
                     }
