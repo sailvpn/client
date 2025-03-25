@@ -20,8 +20,8 @@ import java.util.List;
 
 public class V5CmdReqDecoder extends ReplayingDecoder<State> {
 
-    @Autowired
-    private V5AddressDecoder v5AddressDecoder;
+    @Autowired 
+    V5AddressDecoder v5AddressDecoder;
 
     public V5CmdReqDecoder() {
         super(State.INIT);
