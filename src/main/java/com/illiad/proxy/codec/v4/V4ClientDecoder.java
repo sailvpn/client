@@ -19,8 +19,7 @@ import java.util.List;
  * other handler can remove this decoder later.  On failed decode, this decoder will discard the
  * received data, so that other handler closes the connection later.
  */
-public class V4ClientDecoder extends ReplayingDecoder<State> {
-
+public class V4ClientDecoder extends ReplayingDecoder<V4ClientDecoder.State> {
 
     public V4ClientDecoder() {
         super(State.START);
@@ -44,8 +43,8 @@ public class V4ClientDecoder extends ReplayingDecoder<State> {
                     out.add(new DefaultSocks4CommandResponse(status, dstAddr, dstPort));
                     checkpoint(State.SUCCESS);
                 }
-                case SUCCESS: {
-                    int readableBytes = actualReadableBytes();
+                casCCESS: {
+e                            int readableBytes = actualReadableBytes();
                     if (readableBytes > 0) {
                         out.add(in.readRetainedSlice(readableBytes));
                     }
@@ -63,16 +62,21 @@ public class V4ClientDecoder extends ReplayingDecoder<State> {
     }
 
     private void fail(List<Object> out, Exception cause) {
-
         Socks4CommandResponse m = new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED);
         if (cause instanceof DecoderException) {
             m.setDecoderResult(DecoderResult.failure(cause));
-        }else {
+        } else {
             m.setDecoderResult(DecoderResult.failure(new DecoderException(cause)));
         }
         out.add(m);
 
         checkpoint(State.FAILURE);
+    }
+
+    enum State {
+        START,
+        SUCCESS,
+        FAILURE
     }
 }
 
