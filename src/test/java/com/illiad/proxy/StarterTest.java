@@ -6,6 +6,7 @@ import com.illiad.proxy.config.Params;
 import com.illiad.proxy.handler.v4.V4CommandHandler;
 import com.illiad.proxy.handler.v5.V5CommandHandler;
 import io.netty.channel.ChannelInitializer;
+import io.netty.channel.socket.SocketChannel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -37,7 +38,7 @@ class StarterTest {
         Starter starter = new Starter(params, v4ServerEncoder, v4CommandHandler, v5ServerEncoder, v5CommandHandler);
 
         // Verify that the server is configured correctly
-        ArgumentCaptor captor = ArgumentCaptor.forClass(ChannelInitializer.class);
+        ArgumentCaptor<ChannelInitializer<SocketChannel>> captor = ArgumentCaptor.forClass(ChannelInitializer.class);
         verify(params).getLocalPort();
         verifyNoMoreInteractions(params, v4ServerEncoder, v4CommandHandler, v5ServerEncoder, v5CommandHandler);
     }
