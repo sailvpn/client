@@ -17,10 +17,10 @@ import java.util.List;
  * other handler can remove or replace this decoder later.  On failed decode, this decoder will
  * discard the received data, so that other handler closes the connection later.
  */
-public class V5ClientDecoder extends ReplayingDecoder<State> {
+public class V5ClientDecoder extends ReplayingDecoder<V5ClientDecoder.State> {
 
-    @Autowired
-    private V5AddressDecoder v5AddressDecoder;
+    @Autowired 
+    V5AddressDecoder v5AddressDecoder;
 
     public V5ClientDecoder() {
         super(State.INIT);
@@ -74,5 +74,11 @@ public class V5ClientDecoder extends ReplayingDecoder<State> {
                 Socks5CommandStatus.FAILURE, Socks5AddressType.IPv4, null, 0);
         m.setDecoderResult(DecoderResult.failure(cause));
         out.add(m);
+    }
+
+    enum State {
+        INIT,
+        SUCCESS,
+        FAILURE
     }
 }
