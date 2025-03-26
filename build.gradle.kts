@@ -31,3 +31,11 @@ dependencies {
 tasks.withType<Test> {
 	useJUnitPlatform()
 }
+
+tasks.test {
+	// OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+	//kotlin
+	jvmArgs = listOf("-Xshare:off")
+	//groovy
+	// jvmArgs "-Xshare:off";
+}
