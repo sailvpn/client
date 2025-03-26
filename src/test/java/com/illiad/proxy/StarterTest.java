@@ -6,7 +6,6 @@ import com.illiad.proxy.config.Params;
 import com.illiad.proxy.handler.v4.V4CommandHandler;
 import com.illiad.proxy.handler.v5.V5CommandHandler;
 import io.netty.channel.ChannelInitializer;
-import io.netty.channel.socket.SocketChannel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
