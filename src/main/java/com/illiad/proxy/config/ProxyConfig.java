@@ -82,7 +82,7 @@ public class ProxyConfig {
     }
 
     @Bean
-    public V5ConnectHandler V5ConnectHandler(Ssl ssl, Params params, HeaderEncoder headerEncoder, V5ClientEncoder v5ClientEncoder, Utils utils) {
+    public V5ConnectHandler v5ConnectHandler(Ssl ssl, Params params, HeaderEncoder headerEncoder, V5ClientEncoder v5ClientEncoder, Utils utils) {
         return new V5ConnectHandler(ssl, params, headerEncoder, v5ClientEncoder, utils);
     }
 
