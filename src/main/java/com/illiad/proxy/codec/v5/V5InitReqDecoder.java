@@ -18,7 +18,7 @@ import java.util.List;
  * On successful decode, this decoder will forward the received data to the next handler, On failed decode, this decoder will
  * discard the received data, the decoder remove itself upon exiting.
  */
-public class V5InitReqDecoder extends ReplayingDecoder<State> {
+public class V5InitReqDecoder extends ReplayingDecoder<V5InitReqDecoder.State> {
     public V5InitReqDecoder() {
         super(State.INIT);
     }
@@ -73,5 +73,11 @@ public class V5InitReqDecoder extends ReplayingDecoder<State> {
             m.setDecoderResult(DecoderResult.failure(new DecoderException(cause)));
         }
         out.add(m);
+    }
+
+    enum State {
+        INIT, 
+        SUCCESS, 
+        FAILURE
     }
 }
