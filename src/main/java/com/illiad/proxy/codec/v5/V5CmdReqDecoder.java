@@ -18,7 +18,7 @@ import java.util.List;
  * discard the received data, so that other handler closes the connection later.
  */
 
-public class V5CmdReqDecoder extends ReplayingDecoder<State> {
+public class V5CmdReqDecoder extends ReplayingDecoder<V5CmdReqDecoder.State> {
 
     @Autowired 
     V5AddressDecoder v5AddressDecoder;
@@ -77,5 +77,11 @@ public class V5CmdReqDecoder extends ReplayingDecoder<State> {
             m.setDecoderResult(DecoderResult.failure(new DecoderException(cause)));
         }
         out.add(m);
+    }
+
+    enum State {
+        INIT,
+        SUCCESS,
+        FAILURE
     }
 }
