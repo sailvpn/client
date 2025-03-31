@@ -44,7 +44,7 @@ class VersionHandlerTest {
     }
 
     @Test
-    void testDecodeSocks4a() throws Exception {
+    void testDecodeSocks4a() {
         ByteBuf in = Unpooled.buffer();
         in.writeByte(SocksVersion.SOCKS4a.byteValue()); // SOCKS4a version
 
@@ -57,7 +57,7 @@ class VersionHandlerTest {
     }
 
     @Test
-    void testDecodeSocks5() throws Exception {
+    void testDecodeSocks5() {
         ByteBuf in = Unpooled.buffer();
         in.writeByte(SocksVersion.SOCKS5.byteValue()); // SOCKS5 version
 
@@ -70,7 +70,7 @@ class VersionHandlerTest {
     }
 
     @Test
-    void testDecodeUnknownVersion() throws Exception {
+    void testDecodeUnknownVersion() {
         ByteBuf in = Unpooled.buffer();
         in.writeByte(0x03); // Unknown version
 
