@@ -3,14 +3,17 @@ package com.illiad.proxy;
 import com.illiad.proxy.codec.v4.V4ServerEncoder;
 import com.illiad.proxy.codec.v5.V5ServerEncoder;
 import com.illiad.proxy.config.Params;
+import com.illiad.proxy.handler.VersionHandler;
 import com.illiad.proxy.handler.v4.V4CommandHandler;
 import com.illiad.proxy.handler.v5.V5CommandHandler;
 import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.logging.LoggingHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
+import org.junit.platform.commons.support.ReflectionSupport;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -37,11 +40,20 @@ class StarterTest {
     }
 
     @Test
-    void testStarter() {
-
-        // Verify that the server is configured correctly
-        ArgumentCaptor<ChannelInitializer<SocketChannel>> captor = ArgumentCaptor.forClass(ChannelInitializer.class);
+    void testStarterConfiguration() {
+        // Verify that the Params bean's getLocalPort method is called
         verify(params).getLocalPort();
-        verifyNoMoreInteractions(params, v4ServerEncoder, v4CommandHandler, v5ServerEncoder, v5CommandHandler);
+        // Mock a pipeline and verify the handlers
+        ChannelPipeline pipeline = mock(ChannelPipeline.class);
+        SocketChannel channel = mock(SocketChannel.class);
+        when(channel.pipeline()).thenReturn(pipeline);
+        try {
+            ReflectionSupport.invokeMethod(ChannelInitializer.class.getMethod("initChannel"), channel);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        verify(pipeline).addLast(any(LoggingHandler.class), any(VersionHandler.class));
     }
+
 }

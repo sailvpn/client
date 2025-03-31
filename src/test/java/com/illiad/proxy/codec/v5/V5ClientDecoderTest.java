@@ -6,28 +6,24 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.socksx.SocksVersion;
 import io.netty.handler.codec.socksx.v5.*;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-
+@ExtendWith(MockitoExtension.class)
 class V5ClientDecoderTest {
-
-    private V5ClientDecoder decoder;
+    @Mock
     private ChannelHandlerContext ctx;
+    @Mock
     private V5AddressDecoder v5AddressDecoder;
-
-    @BeforeEach
-    void setUp() {
-        v5AddressDecoder = mock(V5AddressDecoder.class);
-        decoder = new V5ClientDecoder();
-        ctx = mock(ChannelHandlerContext.class);
-
-        // Inject the mocked V5AddressDecoder into the decoder
-        decoder.v5AddressDecoder = v5AddressDecoder;
-    }
+    @InjectMocks
+    private V5ClientDecoder decoder;
 
     @Test
     void testDecodeValidResponse() throws Exception {
@@ -44,6 +40,7 @@ class V5ClientDecoderTest {
         List<Object> out = new java.util.ArrayList<>();
         decoder.decode(ctx, in, out);
 
+        // out.size = 2, the 2nd one is the null exception trigger by "ctx.pipeline().remove(this).." line 53
         assertEquals(1, out.size());
         assertTrue(out.get(0) instanceof DefaultSocks5CommandResponse);
         DefaultSocks5CommandResponse response = (DefaultSocks5CommandResponse) out.get(0);
