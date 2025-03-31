@@ -9,33 +9,35 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-
-
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import static org.mockito.Mockito.*;
-
+@ExtendWith(MockitoExtension.class)
 class StarterTest {
 
+    @Mock
     private Params params;
+    @Mock
     private V4ServerEncoder v4ServerEncoder;
+    @Mock
     private V4CommandHandler v4CommandHandler;
+    @Mock
     private V5ServerEncoder v5ServerEncoder;
+    @Mock
     private V5CommandHandler v5CommandHandler;
+    @InjectMocks
+    private Starter starter;
 
     @BeforeEach
     void setUp() {
-        params = mock(Params.class);
-        v4ServerEncoder = mock(V4ServerEncoder.class);
-        v4CommandHandler = mock(V4CommandHandler.class);
-        v5ServerEncoder = mock(V5ServerEncoder.class);
-        v5CommandHandler = mock(V5CommandHandler.class);
-
         when(params.getLocalPort()).thenReturn(8080);
     }
 
     @Test
     void testStarter() {
-        Starter starter = new Starter(params, v4ServerEncoder, v4CommandHandler, v5ServerEncoder, v5CommandHandler);
 
         // Verify that the server is configured correctly
         ArgumentCaptor<ChannelInitializer<SocketChannel>> captor = ArgumentCaptor.forClass(ChannelInitializer.class);
