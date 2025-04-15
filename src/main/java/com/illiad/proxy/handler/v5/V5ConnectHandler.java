@@ -93,7 +93,8 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         // and server in the real world.
                         pipeline.addLast(ssl.sslCtx.newHandler(ch.alloc(), params.getRemoteHost(), params.getRemotePort()),
                                 // backend inbound decoder: standard socks5 command response
-                                new V5ClientDecoder(), new V5AckHandler(promise),
+                                new V5ClientDecoder(),
+                                new V5AckHandler(promise),
                                 // backend outbound encoder: standard socks5 command request (Connect or UdP)
                                 v5ClientEncoder,
                                 // illiad header
