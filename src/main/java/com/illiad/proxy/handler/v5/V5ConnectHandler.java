@@ -91,7 +91,8 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         // and accept any invalid certificates in the client side.
                         // You will need something more complicated to identify both
                         // and server in the real world.
-                        pipeline.addLast(ssl.sslCtx.newHandler(ch.alloc(), params.getRemoteHost(), params.getRemotePort()),
+                        pipeline.addLast(
+                                ssl.sslCtx.newHandler(ch.alloc(), params.getRemoteHost(), params.getRemotePort()),
                                 // backend inbound decoder: standard socks5 command response
                                 new V5ClientDecoder(),
                                 new V5AckHandler(promise),
