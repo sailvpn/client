@@ -93,7 +93,8 @@ public final class V4ConnectHandler extends SimpleChannelInboundHandler<Socks4Co
                         // and accept any invalid certificates in the client side.
                         // You will need something more complicated to identify both
                         // and server in the real world.
-                        pipeline.addLast(ssl.sslCtx.newHandler(ch.alloc(), params.getRemoteHost(), params.getRemotePort()),
+                        pipeline.addLast(
+                                ssl.sslCtx.newHandler(ch.alloc(), params.getRemoteHost(), params.getRemotePort()),
                                 // backend inbound decoder: standard socks4 command response
                                 new V4ClientDecoder(),
                                 new V4AckHandler(promise),
