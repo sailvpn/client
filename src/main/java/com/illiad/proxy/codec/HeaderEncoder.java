@@ -37,14 +37,8 @@ public class HeaderEncoder extends MessageToByteEncoder<SocksMessage> {
 
         // write secret into byteBuf
         byte[] secretBytes = secret.getSecret();
-        int length = secretBytes.length;
-        if (length < 256) {
-            byteBuf.writeByte(length);
-            byteBuf.writeByte(0);
-        } else {
-            byteBuf.writeByte(length & 0xFF);
-            byteBuf.writeByte((length >> 8) & 0xFF);
-        }
+        // write the length of the secret into byteBuf(2 bytes), followed by the secret, and CRLF
+        byteBuf.writeShort(secretBytes.length & 0xFFFF);
         byteBuf.writeBytes(secretBytes);
         byteBuf.writeBytes(CRLF);
 
