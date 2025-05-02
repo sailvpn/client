@@ -1,5 +1,6 @@
 package com.illiad.proxy.handler.v5;
 
+import com.illiad.proxy.HandlerNamer;
 import com.illiad.proxy.codec.v5.V5CmdReqDecoder;
 import com.illiad.proxy.handler.Utils;
 import io.netty.channel.*;
@@ -11,10 +12,12 @@ import org.springframework.stereotype.Component;
 @ChannelHandler.Sharable
 public class V5CommandHandler extends SimpleChannelInboundHandler<Socks5Message> {
     private final V5ConnectHandler connectHandler;
+    private final HandlerNamer namer;
     private final Utils utils;
 
-    public V5CommandHandler(V5ConnectHandler connectHandler, Utils utils) {
+    public V5CommandHandler(V5ConnectHandler connectHandler, HandlerNamer namer, Utils utils) {
         this.connectHandler = connectHandler;
+        this.namer = namer;
         this.utils = utils;
     }
 
@@ -25,14 +28,14 @@ public class V5CommandHandler extends SimpleChannelInboundHandler<Socks5Message>
             // auth support example
             //ctx.pipeline().addFirst(new V5PwdAuthReqDecoder());
             //ctx.write(new DefaultSocks5AuthMethodResponse(Socks5AuthMethod.PASSWORD));
-            ctx.pipeline().addFirst(new V5CmdReqDecoder());
+            ctx.pipeline().addFirst(namer.generateName(), new V5CmdReqDecoder());
             ctx.write(new DefaultSocks5InitialResponse(Socks5AuthMethod.NO_AUTH));
         } else if (socksRequest instanceof Socks5PasswordAuthRequest) {
-            ctx.pipeline().addFirst(new V5CmdReqDecoder());
+            ctx.pipeline().addFirst(namer.generateName(), new V5CmdReqDecoder());
             ctx.write(new DefaultSocks5PasswordAuthResponse(Socks5PasswordAuthStatus.SUCCESS));
         } else if (socksRequest instanceof Socks5CommandRequest socks5CmdRequest) {
             if (socks5CmdRequest.type() == Socks5CommandType.CONNECT) {
-                ctx.pipeline().addLast(connectHandler);
+                ctx.pipeline().addLast(namer.generateName(), connectHandler);
                 ctx.pipeline().remove(this);
                 ctx.fireChannelRead(socksRequest);
             } else {
