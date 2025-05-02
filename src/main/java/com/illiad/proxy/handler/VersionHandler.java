@@ -1,5 +1,6 @@
 package com.illiad.proxy.handler;
 
+import com.illiad.proxy.HandlerNamer;
 import com.illiad.proxy.codec.v4.V4ServerDecoder;
 import com.illiad.proxy.codec.v4.V4ServerEncoder;
 import com.illiad.proxy.codec.v5.V5InitReqDecoder;
@@ -26,12 +27,14 @@ public class VersionHandler extends ByteToMessageDecoder {
     private static final InternalLogger logger =
             InternalLoggerFactory.getInstance(VersionHandler.class);
 
+    private final HandlerNamer namer;
     private final V4ServerEncoder v4ServerEncoder;
     private final V5ServerEncoder v5ServerEncoder;
     private final V4CommandHandler v4CommandHandler;
     private final V5CommandHandler v5CommandHandler;
 
-    public VersionHandler(V4ServerEncoder v4ServerEncoder, V4CommandHandler v4CommandHandler, V5ServerEncoder v5ServerEncoder, V5CommandHandler v5CommandHandler) {
+    public VersionHandler(HandlerNamer namer, V4ServerEncoder v4ServerEncoder, V4CommandHandler v4CommandHandler, V5ServerEncoder v5ServerEncoder, V5CommandHandler v5CommandHandler) {
+        this.namer = namer;
         this.v4ServerEncoder = v4ServerEncoder;
         this.v4CommandHandler = v4CommandHandler;
         this.v5ServerEncoder = v5ServerEncoder;
@@ -52,19 +55,15 @@ public class VersionHandler extends ByteToMessageDecoder {
         switch (version) {
             case SOCKS4a:
                 logKnownVersion(ctx, version);
-                p.addLast(
-                        v4ServerEncoder,
-                        new V4ServerDecoder(),
-                        v4CommandHandler
-                );
+                p.addLast(namer.generateName(), v4ServerEncoder);
+                p.addLast(namer.generateName(), new V4ServerDecoder());
+                p.addLast(namer.generateName(), v4CommandHandler);
                 break;
             case SOCKS5:
                 logKnownVersion(ctx, version);
-                p.addLast(
-                        v5ServerEncoder,
-                        new V5InitReqDecoder(),
-                        v5CommandHandler
-                );
+                p.addLast(namer.generateName(), v5ServerEncoder);
+                p.addLast(namer.generateName(), new V5InitReqDecoder());
+                p.addLast(namer.generateName(), v5CommandHandler);
                 break;
             default:
                 logUnknownVersion(ctx, versionVal);
