@@ -1,5 +1,6 @@
 package com.illiad.proxy.handler.v5;
 
+import com.illiad.proxy.HandlerNamer;
 import com.illiad.proxy.codec.HeaderEncoder;
 
 import com.illiad.proxy.codec.v5.V5ClientDecoder;
@@ -25,15 +26,17 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
 
     private final Ssl ssl;
     private final Params params;
+    private final HandlerNamer namer;
     private final HeaderEncoder headerEncoder;
     private final V5ClientEncoder v5ClientEncoder;
     private final Utils utils;
     private final Bootstrap b = new Bootstrap();
 
-    public V5ConnectHandler(Ssl ssl, Params params, HeaderEncoder headerEncoder, V5ClientEncoder v5ClientEncoder, Utils utils) {
+    public V5ConnectHandler(Ssl ssl, Params params, HandlerNamer namer, HeaderEncoder headerEncoder, V5ClientEncoder v5ClientEncoder, Utils utils) {
 
         this.ssl = ssl;
         this.params = params;
+        this.namer = namer;
         this.headerEncoder = headerEncoder;
         this.v5ClientEncoder = v5ClientEncoder;
         this.utils = utils;
@@ -50,36 +53,32 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
             final Channel backend = future.getNow();
             final ChannelPipeline backendPipeline = backend.pipeline();
             if (future.isSuccess()) {
+                String prefix = namer.getPrefix();
                 // remove all handlers except SslHandler from backendPipeline
                 for (String name : backendPipeline.names()) {
-                    ChannelHandler handler = backendPipeline.get(name);
-                    if (handler instanceof SslHandler) {
-                        continue;
+                    if (name.startsWith(prefix)) {
+                        backendPipeline.remove(name);
                     }
-                    backendPipeline.remove(name);
                 }
 
                 // remove all handlers except LoggingHandler from frontendPipeline
                 for (String name : frontendPipeline.names()) {
-                    ChannelHandler handler = backendPipeline.get(name);
-                    if (handler instanceof LoggingHandler) {
-                        continue;
+                    if (name.startsWith(prefix)) {
+                        frontendPipeline.remove(name);
                     }
-                    frontendPipeline.remove(name);
                 }
 
                 // setup Socks direct channel relay between frontend and backend
                 frontendPipeline.addLast(new RelayHandler(backend, utils));
                 backendPipeline.addLast(new RelayHandler(frontend, utils));
-                // restore frontend auto read
-                frontend.config().setAutoRead(true);
             } else {
                 utils.closeOnFlush(ctx.channel());
                 ctx.fireExceptionCaught(future.cause());
             }
         });
 
-        b.group(ctx.channel().eventLoop()).channel(NioSocketChannel.class)
+        b.group(ctx.channel().eventLoop())
+                .channel(NioSocketChannel.class)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
                 .option(ChannelOption.SO_KEEPALIVE, true)
                 .handler(new ChannelInitializer<SocketChannel>() {
@@ -91,20 +90,18 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         // and accept any invalid certificates in the client side.
                         // You will need something more complicated to identify both
                         // and server in the real world.
-                        pipeline.addLast(
-                                ssl.sslCtx.newHandler(ch.alloc(), params.getRemoteHost(), params.getRemotePort()),
-                                // backend inbound decoder: standard socks5 command response
-                                new V5ClientDecoder(),
-                                new V5AckHandler(promise),
-                                // backend outbound encoder: standard socks5 command request (Connect or UdP)
-                                v5ClientEncoder,
-                                // illiad header
-                                headerEncoder);
+                        pipeline.addLast(ssl.sslCtx.newHandler(ch.alloc(), params.getRemoteHost(), params.getRemotePort()));
+                        // backend inbound decoder: standard socks5 command response
+                        pipeline.addLast(namer.generateName(), new V5ClientDecoder());
+                        pipeline.addLast(namer.generateName(), new V5AckHandler(promise));
+                        // backend outbound encoder: standard socks5 command request (Connect or UdP)
+                        pipeline.addLast(namer.generateName(), v5ClientEncoder);
+                        // illiad header
+                        pipeline.addLast(namer.generateName(), headerEncoder);
                     }
-                });
-
-        // connect to the proxy server, and forward the Socks connect command message to the remote server
-        b.connect(params.getRemoteHost(), params.getRemotePort()).channel()
+                })
+                // connect to the proxy server, and forward the Socks connect command message to the remote server
+                .connect(params.getRemoteHost(), params.getRemotePort()).channel()
                 .writeAndFlush(request)
                 .addListener((ChannelFutureListener) future -> {
                     if (future.isSuccess()) {
@@ -115,7 +112,6 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         ctx.fireExceptionCaught(future.cause());
                     }
                 });
-
     }
 
     @Override
