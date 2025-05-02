@@ -22,10 +22,7 @@ public class V5AckHandler extends SimpleChannelInboundHandler<Socks5CommandRespo
         // wite response to frontend
         frontend.writeAndFlush(response).addListener(future -> {
             if (future.isSuccess()) {
-                // put frontend input onhold until both frontend and backend are ready
-                frontend.config().setAutoRead(false);
                 // trigger promise as per message status
-
                 if (response.status() == Socks5CommandStatus.SUCCESS) {
                     ctx.pipeline().remove(this);
                     promise.setSuccess(ctx.channel());
