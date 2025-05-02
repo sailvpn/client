@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class Starter {
 
-    public Starter(Params params, V4ServerEncoder v4ServerEncoder, V4CommandHandler v4CommandHandler, V5ServerEncoder v5ServerEncoder, V5CommandHandler v5CommandHandler) {
+    public Starter(Params params, HandlerNamer namer, V4ServerEncoder v4ServerEncoder, V4CommandHandler v4CommandHandler, V5ServerEncoder v5ServerEncoder, V5CommandHandler v5CommandHandler) {
         // Configure the bootstrap.
         EventLoopGroup bossGroup = new NioEventLoopGroup(3);
         EventLoopGroup workerGroup = new NioEventLoopGroup(4);
@@ -35,7 +35,7 @@ public class Starter {
                             ChannelPipeline pipeline = ch.pipeline();
                             pipeline.addLast(
                                     new LoggingHandler(LogLevel.INFO),
-                                    new VersionHandler(v4ServerEncoder, v4CommandHandler, v5ServerEncoder, v5CommandHandler));
+                                    new VersionHandler(namer, v4ServerEncoder, v4CommandHandler, v5ServerEncoder, v5CommandHandler));
                         }
                     });
             b.bind(params.getLocalPort()).sync().channel().closeFuture().sync();
