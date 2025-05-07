@@ -10,6 +10,8 @@ public interface Secret {
 
     Cryptos getCryptoType(byte b);
 
+    short getCryptoLength();
+
     boolean verify(byte[] secret) throws NoSuchAlgorithmException;
 
 }

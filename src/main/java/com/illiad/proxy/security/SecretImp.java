@@ -38,6 +38,11 @@ public class SecretImp implements Secret {
     }
 
     @Override
+    public short getCryptoLength() {
+        return this.cryptoByte.byteLength(Cryptos.valueOf(params.getCrypto()));
+    }
+
+    @Override
     public boolean verify(byte[] secret) throws NoSuchAlgorithmException {
         return Arrays.equals(secret, this.getSecret());
     }
