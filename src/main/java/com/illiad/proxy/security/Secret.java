@@ -1,7 +1,15 @@
 package com.illiad.proxy.security;
 
-public interface Secret {
-    byte[] getSecret();
 
-    boolean verify(byte[] secret);
+import java.security.NoSuchAlgorithmException;
+
+public interface Secret {
+    byte[] getSecret() throws Exception;
+
+    Cryptos getCryptoType();
+
+    Cryptos getCryptoType(byte b);
+
+    boolean verify(byte[] secret) throws NoSuchAlgorithmException;
+
 }
