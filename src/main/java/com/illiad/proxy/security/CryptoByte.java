@@ -143,36 +143,24 @@ public class CryptoByte {
         switch (c) {
             case SHA_224:
             case HMAC_SHA224:
-            case SHA224_WITH_RSA:
-            case SHA224_WITH_DSA:
-            case SHA224_WITH_ECDSA:
             case SHA3_224:
             case HMAC_SHA3_224:
                 return 28; // 224 bits = 28 bytes
 
             case SHA_256:
             case HMAC_SHA256:
-            case SHA256_WITH_RSA:
-            case SHA256_WITH_DSA:
-            case SHA256_WITH_ECDSA:
             case SHA3_256:
             case HMAC_SHA3_256:
                 return 32; // 256 bits = 32 bytes
 
             case SHA_384:
             case HMAC_SHA384:
-            case SHA384_WITH_RSA:
-            case SHA384_WITH_DSA:
-            case SHA384_WITH_ECDSA:
             case SHA3_384:
             case HMAC_SHA3_384:
                 return 48; // 384 bits = 48 bytes
 
             case SHA_512:
             case HMAC_SHA512:
-            case SHA512_WITH_RSA:
-            case SHA512_WITH_DSA:
-            case SHA512_WITH_ECDSA:
             case SHA3_512:
             case HMAC_SHA3_512:
                 return 64; // 512 bits = 64 bytes
@@ -182,6 +170,20 @@ public class CryptoByte {
 
             case SHA_512_256:
                 return 32; // 256 bits = 32 bytes
+
+            case SHA224_WITH_RSA:
+            case SHA224_WITH_DSA:
+            case SHA224_WITH_ECDSA:
+            case SHA256_WITH_RSA:
+            case SHA256_WITH_DSA:
+            case SHA256_WITH_ECDSA:
+            case SHA384_WITH_RSA:
+            case SHA384_WITH_DSA:
+            case SHA384_WITH_ECDSA:
+            case SHA512_WITH_RSA:
+            case SHA512_WITH_DSA:
+            case SHA512_WITH_ECDSA:
+                return -1; // return -1 for variable length signatures
 
             default:
                 throw new IllegalArgumentException("Unknown Cryptos standard: " + c);
