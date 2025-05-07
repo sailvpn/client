@@ -139,7 +139,7 @@ public class CryptoByte {
         }
     }
 
-    public int byteLength(Cryptos c) {
+    public short byteLength(Cryptos c) {
         switch (c) {
             case SHA_224:
             case HMAC_SHA224:
@@ -183,7 +183,7 @@ public class CryptoByte {
             case SHA512_WITH_RSA:
             case SHA512_WITH_DSA:
             case SHA512_WITH_ECDSA:
-                return -1; // return -1 for variable length signatures
+                return 0; // return 0 for variable length signatures
 
             default:
                 throw new IllegalArgumentException("Unknown Cryptos standard: " + c);
