@@ -42,7 +42,7 @@ public class HeaderEncoder extends MessageToByteEncoder<SocksMessage> {
         // check if the crypto type is fixed length
         if (signLength > 0) {
             // if the crypto type indicates that the encryption return a fixed-length signature, the length field contains the whole length(signature + offset).
-            byteBuf.writeShort((short)(signLength + offset.length) & 0xFFFF);
+            byteBuf.writeShort((short) (signLength + offset.length) & 0xFFFF);
         } else {
             // if the crypto type indicates that the encryption return a variable-length signature, the length field contain the length of the signature only.
             byteBuf.writeShort((short) (secretBytes.length) & 0xFFFF);
