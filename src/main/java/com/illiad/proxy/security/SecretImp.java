@@ -38,6 +38,11 @@ public class SecretImp implements Secret {
     }
 
     @Override
+    public byte getCryptoTypeByte() {
+        return this.cryptoByte.toByte(Cryptos.valueOf(params.getCrypto()));
+    }
+
+    @Override
     public short getCryptoLength() {
         return this.cryptoByte.byteLength(Cryptos.valueOf(params.getCrypto()));
     }
@@ -47,6 +52,7 @@ public class SecretImp implements Secret {
         return Arrays.equals(secret, this.getSecret());
     }
 
+    @Override
     public byte[] offset() {
         int length = random.nextInt(params.getMax() - params.getMin()) + params.getMin();
         byte[] byteArray = new byte[length];
