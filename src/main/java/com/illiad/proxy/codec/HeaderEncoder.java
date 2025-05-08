@@ -38,7 +38,7 @@ public class HeaderEncoder extends MessageToByteEncoder<SocksMessage> {
         }
 
         byte[] offset = secret.offset();
-        short signLength = (short) secret.getCryptoLength();
+        short signLength = secret.getCryptoLength();
         // check if the crypto type is fixed length
         if (signLength > 0) {
             // if the crypto type indicates that the encryption return a fixed-length signature, the length field contains the whole length(signature + offset).
