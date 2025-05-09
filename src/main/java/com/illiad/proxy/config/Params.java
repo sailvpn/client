@@ -12,8 +12,8 @@ public class Params {
     String remoteHost = System.getProperty("remoteHost", "www.google.com");
     int remotePort = Integer.parseInt(System.getProperty("remotePort", "443"));
     String crypto = System.getProperty("crypto", "SHA-256");
-    int min = Integer.parseInt(System.getProperty("min", "8"));
-    int max = Integer.parseInt(System.getProperty("max", "256"));
+    int min = 8; // important, never change this one, or the sytem will break
+    int max = 128; // important, maximum value 256
     String secret = "password";
 
 }
