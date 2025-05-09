@@ -8,13 +8,9 @@ public interface Secret {
 
     Cryptos getCryptoType();
 
-    Cryptos getCryptoType(byte b);
-
     byte getCryptoTypeByte();
 
     short getCryptoLength();
-
-    boolean verify(byte[] secret) throws NoSuchAlgorithmException;
 
     byte[] offset();
 }

@@ -2,11 +2,9 @@ package com.illiad.proxy.security;
 
 import com.illiad.proxy.config.Params;
 import org.springframework.stereotype.Component;
-
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 import java.util.Random;
 
 @Component
@@ -33,11 +31,6 @@ public class SecretImp implements Secret {
     }
 
     @Override
-    public Cryptos getCryptoType(byte b) {
-        return this.cryptoByte.toCrypto(b);
-    }
-
-    @Override
     public byte getCryptoTypeByte() {
         return this.cryptoByte.toByte(Cryptos.valueOf(params.getCrypto()));
     }
@@ -45,11 +38,6 @@ public class SecretImp implements Secret {
     @Override
     public short getCryptoLength() {
         return this.cryptoByte.byteLength(Cryptos.valueOf(params.getCrypto()));
-    }
-
-    @Override
-    public boolean verify(byte[] secret) throws NoSuchAlgorithmException {
-        return Arrays.equals(secret, this.getSecret());
     }
 
     @Override
