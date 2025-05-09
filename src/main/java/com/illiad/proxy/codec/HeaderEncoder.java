@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Encodes a client-side illiad Header into a {@link ByteBuf}.
- * an illiad header is a byte array of variable lenght, followed by CRLF.
+ * an illiad header is a byte array of variable lenght, ended by CRLF.
  * the first 2 bytes is the length of the header. the next byte is the crypto type. then comes the signature, and a random offset.
  * if the crypto type indicates that the encryption return a fixed-length signature, the length field contains the whole length(signature + offset).
  * if the crypto type indicates that the encryption return a variable-length signature, the length field contain the length of the signature only.
