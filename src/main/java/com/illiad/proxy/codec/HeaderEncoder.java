@@ -12,8 +12,8 @@ import org.springframework.stereotype.Component;
  * Encodes a client-side illiad Header into a {@link ByteBuf}.
  * an illiad header is a byte array of variable lenght, ended by CRLF.
  * the first 2 bytes is the length of the header. the next byte is the crypto type. then comes the signature, and a random offset.
- * if the crypto type indicates that the encryption return a fixed-length signature, the length field contains the whole length(signature + offset).
- * if the crypto type indicates that the encryption return a variable-length signature, the length field contain the length of the signature only.
+ * if the encryption returns a fixed-length signature, the length field contains the whole length(length + cryptoType + signature + offset CRLF).
+ * if the encryption returns a variable-length signature, the length field contain the length of the signature only(length + cryptoType + signature).
  */
 @Component
 @ChannelHandler.Sharable
@@ -41,11 +41,11 @@ public class HeaderEncoder extends MessageToByteEncoder<SocksMessage> {
         short signLength = secret.getCryptoLength();
         // check if the crypto type is fixed length
         if (signLength > 0) {
-            // if the crypto type indicates that the encryption return a fixed-length signature, the length field contains the whole length(signature + offset).
+            // the encryption returns a fixed-length signature, the length field contains the whole length(length + cryptoType + signature + offset CRLF).
             // 5 = 2 bytes for length + 1 byte for crypto type + 2 bytes for CRLF
             byteBuf.writeShort((short) (signLength + offset.length + 5) & 0xFFFF);
         } else {
-            // if the crypto type indicates that the encryption return a variable-length signature, the length field contain the length of the signature only.
+            // the encryption returns a variable-length signature, the length field contain the length of the signature only(length + cryptoType + signature).
             // 3 = 2 bytes for length + 1 byte for crypto type
             byteBuf.writeShort((short) (secretBytes.length + 3) & 0xFFFF);
         }
