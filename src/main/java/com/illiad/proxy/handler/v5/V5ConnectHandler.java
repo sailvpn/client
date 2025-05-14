@@ -53,6 +53,9 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
             final Channel backend = future.getNow();
             final ChannelPipeline backendPipeline = backend.pipeline();
             if (future.isSuccess()) {
+                // setup Socks direct channel relay between frontend and backend
+                frontendPipeline.addLast(new RelayHandler(backend, utils));
+                backendPipeline.addLast(new RelayHandler(frontend, utils));
                 String prefix = namer.getPrefix();
                 // remove all handlers except SslHandler from backendPipeline
                 for (String name : backendPipeline.names()) {
@@ -60,17 +63,12 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         backendPipeline.remove(name);
                     }
                 }
-
                 // remove all handlers except LoggingHandler from frontendPipeline
                 for (String name : frontendPipeline.names()) {
                     if (name.startsWith(prefix)) {
                         frontendPipeline.remove(name);
                     }
                 }
-
-                // setup Socks direct channel relay between frontend and backend
-                frontendPipeline.addLast(new RelayHandler(backend, utils));
-                backendPipeline.addLast(new RelayHandler(frontend, utils));
             } else {
                 utils.closeOnFlush(ctx.channel());
                 ctx.fireExceptionCaught(future.cause());
