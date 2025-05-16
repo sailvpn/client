@@ -43,4 +43,4 @@ def query_socks5_authentication(proxy_host, proxy_port):
         sock.close()
 
 # Query the SOCKS5 proxy
-query_socks5_authentication("127.0.0.1", 2080)  # Replace with your proxy's IP and port
+query_socks5_authentication("127.0.0.1", 3080)  # Replace with your proxy's IP and port

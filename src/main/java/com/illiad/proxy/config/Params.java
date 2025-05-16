@@ -8,7 +8,7 @@ import lombok.Data;
 @ConfigurationProperties("params")
 @Data
 public class Params {
-    int localPort = Integer.parseInt(System.getProperty("localPort", "2080"));
+    int localPort = Integer.parseInt(System.getProperty("localPort", "3080"));
     String remoteHost = System.getProperty("remoteHost", "www.google.com");
     int remotePort = Integer.parseInt(System.getProperty("remotePort", "443"));
     String crypto = System.getProperty("crypto", "SHA-256");
