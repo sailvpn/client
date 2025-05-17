@@ -1,6 +1,7 @@
 package com.illiad.proxy.handler.v5;
 
 import com.illiad.proxy.HandlerNamer;
+import com.illiad.proxy.codec.v5.V5AddressDecoder;
 import com.illiad.proxy.codec.v5.V5CmdReqDecoder;
 import com.illiad.proxy.handler.Utils;
 import io.netty.channel.*;
@@ -12,11 +13,13 @@ import org.springframework.stereotype.Component;
 @ChannelHandler.Sharable
 public class V5CommandHandler extends SimpleChannelInboundHandler<Socks5Message> {
     private final V5ConnectHandler connectHandler;
+    private final V5AddressDecoder v5AddressDecoder;
     private final HandlerNamer namer;
     private final Utils utils;
 
-    public V5CommandHandler(V5ConnectHandler connectHandler, HandlerNamer namer, Utils utils) {
+    public V5CommandHandler(V5ConnectHandler connectHandler, V5AddressDecoder v5AddressDecoder, HandlerNamer namer, Utils utils) {
         this.connectHandler = connectHandler;
+        this.v5AddressDecoder = v5AddressDecoder;
         this.namer = namer;
         this.utils = utils;
     }
@@ -28,10 +31,10 @@ public class V5CommandHandler extends SimpleChannelInboundHandler<Socks5Message>
             // auth support example
             //ctx.pipeline().addFirst(new V5PwdAuthReqDecoder());
             //ctx.write(new DefaultSocks5AuthMethodResponse(Socks5AuthMethod.PASSWORD));
-            ctx.pipeline().addFirst(namer.generateName(), new V5CmdReqDecoder());
+            ctx.pipeline().addFirst(namer.generateName(), new V5CmdReqDecoder(this.v5AddressDecoder));
             ctx.write(new DefaultSocks5InitialResponse(Socks5AuthMethod.NO_AUTH));
         } else if (socksRequest instanceof Socks5PasswordAuthRequest) {
-            ctx.pipeline().addFirst(namer.generateName(), new V5CmdReqDecoder());
+            ctx.pipeline().addFirst(namer.generateName(), new V5CmdReqDecoder(this.v5AddressDecoder));
             ctx.write(new DefaultSocks5PasswordAuthResponse(Socks5PasswordAuthStatus.SUCCESS));
         } else if (socksRequest instanceof Socks5CommandRequest socks5CmdRequest) {
             if (socks5CmdRequest.type() == Socks5CommandType.CONNECT) {
