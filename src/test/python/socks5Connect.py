@@ -46,4 +46,4 @@ def test_socks5_connect(proxy_host, proxy_port, target_host, target_port):
         sock.close()
 
 # Test the SOCKS5 proxy connection
-test_socks5_connect("127.0.0.1", 3080, "example.com", 80)  # Replace with your proxy and target details
+test_socks5_connect("127.0.0.1", 3080, "sina.com.cn", 80)  # Replace with your proxy and target details
