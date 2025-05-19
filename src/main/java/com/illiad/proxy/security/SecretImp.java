@@ -21,7 +21,7 @@ public class SecretImp implements Secret {
 
     @Override
     public byte[] getSecret() throws NoSuchAlgorithmException {
-        MessageDigest digest = MessageDigest.getInstance(params.getCrypto());
+        MessageDigest digest = MessageDigest.getInstance(Cryptos.valueOf(params.getCrypto()).getValue());
         return digest.digest(params.getSecret().getBytes(StandardCharsets.UTF_8));
     }
 
