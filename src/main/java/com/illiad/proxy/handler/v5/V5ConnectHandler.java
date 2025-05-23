@@ -14,14 +14,9 @@ import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.socksx.v5.Socks5CommandRequest;
-import io.netty.handler.logging.LoggingHandler;
-import io.netty.handler.ssl.SslHandler;
 import io.netty.util.concurrent.FutureListener;
 import io.netty.util.concurrent.Promise;
-import org.springframework.stereotype.Component;
 
-@Component
-@ChannelHandler.Sharable
 public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandRequest> {
 
     private final Ssl ssl;

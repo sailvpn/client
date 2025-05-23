@@ -1,26 +1,33 @@
 package com.illiad.proxy.handler.v5;
 
 import com.illiad.proxy.HandlerNamer;
+import com.illiad.proxy.codec.HeaderEncoder;
 import com.illiad.proxy.codec.v5.V5AddressDecoder;
+import com.illiad.proxy.codec.v5.V5ClientEncoder;
 import com.illiad.proxy.codec.v5.V5CmdReqDecoder;
+import com.illiad.proxy.config.Params;
 import com.illiad.proxy.handler.Utils;
+import com.illiad.proxy.security.Ssl;
 import io.netty.channel.*;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.socksx.v5.*;
-import org.springframework.stereotype.Component;
 
-@Component
-@ChannelHandler.Sharable
 public class V5CommandHandler extends SimpleChannelInboundHandler<Socks5Message> {
-    private final V5ConnectHandler connectHandler;
     private final V5AddressDecoder v5AddressDecoder;
+    private final Ssl ssl;
+    private final Params params;
     private final HandlerNamer namer;
+    private final HeaderEncoder headerEncoder;
+    private final V5ClientEncoder v5ClientEncoder;
     private final Utils utils;
 
-    public V5CommandHandler(V5ConnectHandler connectHandler, V5AddressDecoder v5AddressDecoder, HandlerNamer namer, Utils utils) {
-        this.connectHandler = connectHandler;
+    public V5CommandHandler(V5AddressDecoder v5AddressDecoder, Ssl ssl, Params params, HandlerNamer namer, HeaderEncoder headerEncoder, V5ClientEncoder v5ClientEncoder, Utils utils) {
         this.v5AddressDecoder = v5AddressDecoder;
+        this.ssl = ssl;
+        this.params = params;
         this.namer = namer;
+        this.headerEncoder = headerEncoder;
+        this.v5ClientEncoder = v5ClientEncoder;
         this.utils = utils;
     }
 
@@ -38,7 +45,7 @@ public class V5CommandHandler extends SimpleChannelInboundHandler<Socks5Message>
             ctx.write(new DefaultSocks5PasswordAuthResponse(Socks5PasswordAuthStatus.SUCCESS));
         } else if (socksRequest instanceof Socks5CommandRequest socks5CmdRequest) {
             if (socks5CmdRequest.type() == Socks5CommandType.CONNECT) {
-                ctx.pipeline().addLast(namer.generateName(), connectHandler);
+                ctx.pipeline().addLast(namer.generateName(), new V5ConnectHandler(ssl, params, namer, headerEncoder, v5ClientEncoder, utils));
                 ctx.pipeline().remove(this);
                 ctx.fireChannelRead(socksRequest);
             } else {
