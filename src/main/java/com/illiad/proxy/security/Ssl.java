@@ -36,8 +36,6 @@ public class Ssl {
 
         // Build the SslContext with the TrustManagerFactory
         this.sslCtx = SslContextBuilder.forClient().trustManager(trustManagerFactory).build();
-
-
     }
 
 }
