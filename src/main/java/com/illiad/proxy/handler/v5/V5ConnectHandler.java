@@ -90,19 +90,20 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         sslHandler.handshakeFuture().addListener(future1 -> {
                             if (future1.isSuccess()) {
                                 // backend inbound decoder: standard socks5 command response
-                                pipeline.addLast(namer.generateName(), new V5ClientDecoder());
-                                pipeline.addLast(namer.generateName(), new V5AckHandler(ctx.channel(), promise));
-                                // backend outbound encoder: standard socks5 command request (Connect or UdP)
-                                pipeline.addLast(namer.generateName(), v5ClientEncoder);
-                                // illiad header
-                                pipeline.addLast(namer.generateName(), headerEncoder);
-                                ch.writeAndFlush(request).addListener((ChannelFutureListener) future2 -> {
-                                    if (!future2.isSuccess()) {
-                                        System.err.println("Failed to write request: " + future2.cause());
-                                        ctx.channel().close();
-                                        utils.closeOnFlush(ch);
-                                    }
-                                });
+                                pipeline.addLast(namer.generateName(), new V5ClientDecoder())
+                                        .addLast(namer.generateName(), new V5AckHandler(ctx.channel(), promise))
+                                        // backend outbound encoder: standard socks5 command request (Connect or UdP)
+                                        .addLast(namer.generateName(), v5ClientEncoder)
+                                        // illiad header
+                                        .addLast(namer.generateName(), headerEncoder)
+                                        .channel()
+                                        .writeAndFlush(request).addListener((ChannelFutureListener) future2 -> {
+                                            if (!future2.isSuccess()) {
+                                                System.err.println("Failed to write request: " + future2.cause());
+                                                ctx.channel().close();
+                                                utils.closeOnFlush(ch);
+                                            }
+                                        });
                             } else {
                                 System.err.println("SSL Handshake failed: " + future1.cause());
                                 ch.close();
