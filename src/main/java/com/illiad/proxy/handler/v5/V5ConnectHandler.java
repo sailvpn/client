@@ -2,7 +2,6 @@ package com.illiad.proxy.handler.v5;
 
 import com.illiad.proxy.HandlerNamer;
 import com.illiad.proxy.codec.HeaderEncoder;
-
 import com.illiad.proxy.codec.v5.V5ClientDecoder;
 import com.illiad.proxy.codec.v5.V5ClientEncoder;
 import com.illiad.proxy.config.Params;
@@ -14,6 +13,7 @@ import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.socksx.v5.Socks5CommandRequest;
+import io.netty.handler.ssl.SslHandler;
 import io.netty.util.concurrent.FutureListener;
 import io.netty.util.concurrent.Promise;
 
@@ -43,11 +43,11 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
         // define a promise to handle the connection to the remote server
         Promise<Channel> promise = ctx.executor().newPromise();
         promise.addListener((FutureListener<Channel>) future -> {
-            final Channel frontend = ctx.channel();
-            final ChannelPipeline frontendPipeline = ctx.pipeline();
-            final Channel backend = future.getNow();
-            final ChannelPipeline backendPipeline = backend.pipeline();
             if (future.isSuccess()) {
+                final Channel frontend = ctx.channel();
+                final ChannelPipeline frontendPipeline = ctx.pipeline();
+                final Channel backend = future.get();
+                final ChannelPipeline backendPipeline = backend.pipeline();
                 // setup Socks direct channel relay between frontend and backend
                 frontendPipeline.addLast(new RelayHandler(backend, utils));
                 backendPipeline.addLast(new RelayHandler(frontend, utils));
@@ -76,29 +76,39 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                 .option(ChannelOption.SO_KEEPALIVE, true)
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
-                    protected void initChannel(SocketChannel ch) {
-                        ChannelPipeline pipeline = ch.pipeline();
-                        // Add SSL handler first to encrypt and decrypt everything.
-                        // In this example, we use a bogus certificate in the server side
-                        // and accept any invalid certificates in the client side.
-                        // You will need something more complicated to identify both
-                        // and server in the real world.
-                        pipeline.addLast(ssl.sslCtx.newHandler(ch.alloc(), params.getRemoteHost(), params.getRemotePort()));
-                        // backend inbound decoder: standard socks5 command response
-                        pipeline.addLast(namer.generateName(), new V5ClientDecoder());
-                        pipeline.addLast(namer.generateName(), new V5AckHandler(promise));
-                        // backend outbound encoder: standard socks5 command request (Connect or UdP)
-                        pipeline.addLast(namer.generateName(), v5ClientEncoder);
-                        // illiad header
-                        pipeline.addLast(namer.generateName(), headerEncoder);
-                    }
+                    protected void initChannel(SocketChannel sc) {}
                 })
                 // connect to the proxy server, and forward the Socks connect command message to the remote server
-                .connect(params.getRemoteHost(), params.getRemotePort()).channel()
-                .writeAndFlush(request)
+                .connect(params.getRemoteHost(), params.getRemotePort())
                 .addListener((ChannelFutureListener) future -> {
                     if (future.isSuccess()) {
-                        // Connection established use handler provided results
+                        Channel ch = future.channel();
+                        SslHandler sslHandler = ssl.sslCtx.newHandler(ch.alloc(), params.getRemoteHost(), params.getRemotePort());
+                        ChannelPipeline pipeline = ch.pipeline();
+                        pipeline.addLast(sslHandler);
+                        // Add a listener for the SSL handshake
+                        sslHandler.handshakeFuture().addListener(future1 -> {
+                            if (future1.isSuccess()) {
+                                // backend inbound decoder: standard socks5 command response
+                                pipeline.addLast(namer.generateName(), new V5ClientDecoder());
+                                pipeline.addLast(namer.generateName(), new V5AckHandler(ctx.channel(), promise));
+                                // backend outbound encoder: standard socks5 command request (Connect or UdP)
+                                pipeline.addLast(namer.generateName(), v5ClientEncoder);
+                                // illiad header
+                                pipeline.addLast(namer.generateName(), headerEncoder);
+                                ch.writeAndFlush(request).addListener((ChannelFutureListener) future2 -> {
+                                    if (!future2.isSuccess()) {
+                                        System.err.println("Failed to write request: " + future2.cause());
+                                        ctx.channel().close();
+                                        utils.closeOnFlush(ch);
+                                    }
+                                });
+                            } else {
+                                System.err.println("SSL Handshake failed: " + future1.cause());
+                                ch.close();
+                                ctx.channel().close(); // Close the channel on failure
+                            }
+                        });
                     } else {
                         // Close the connection if the connection attempt has failed.
                         utils.closeOnFlush(ctx.channel());
