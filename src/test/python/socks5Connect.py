@@ -30,6 +30,8 @@ def test_socks5_connect(proxy_host, proxy_port, target_host, target_port):
             target_host_bytes +
             target_port_bytes
         )
+        print("Sending SOCKS5 request:")
+        print(connect_request)
         sock.sendall(connect_request)
 
         # Receive the response from the proxy
