@@ -7,18 +7,21 @@ import io.netty.handler.codec.socksx.v5.Socks5CommandResponse;
 import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
 import io.netty.util.concurrent.Promise;
 
+import java.util.concurrent.ExecutionException;
+
 public class V5AckHandler extends SimpleChannelInboundHandler<Socks5CommandResponse> {
 
+    private final Channel frontend;
     private final Promise<Channel> promise;
 
-    public V5AckHandler(Promise<Channel> promise) {
+    public V5AckHandler(Channel frontend, Promise<Channel> promise) {
+        this.frontend = frontend;
         this.promise = promise;
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, Socks5CommandResponse response) {
+    protected void channelRead0(ChannelHandlerContext ctx, Socks5CommandResponse response) throws ExecutionException, InterruptedException {
 
-        Channel frontend = promise.getNow();
         // wite response to frontend
         frontend.writeAndFlush(response).addListener(future -> {
             if (future.isSuccess()) {
@@ -33,6 +36,7 @@ public class V5AckHandler extends SimpleChannelInboundHandler<Socks5CommandRespo
             } else {
                 promise.setFailure(future.cause());
                 ctx.fireExceptionCaught(future.cause());
+                ctx.channel().close();
             }
         });
 
