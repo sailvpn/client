@@ -54,7 +54,7 @@ public class HeaderEncoder extends MessageToByteEncoder<SocksMessage> {
         byteBuf.writeBytes(secretBytes);
         byteBuf.writeBytes(offset);
         byteBuf.writeBytes(CRLF);
-        ctx.writeAndFlush(socksMessage);
+        ctx.write(socksMessage);
     }
 
 

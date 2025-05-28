@@ -89,13 +89,13 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         // Add a listener for the SSL handshake
                         sslHandler.handshakeFuture().addListener(future1 -> {
                             if (future1.isSuccess()) {
-                                // backend inbound decoder: standard socks5 command response
-                                pipeline.addLast(namer.generateName(), new V5ClientDecoder())
-                                        .addLast(namer.generateName(), new V5AckHandler(ctx.channel(), promise))
-                                        // backend outbound encoder: standard socks5 command request (Connect or UdP)
-                                        .addLast(namer.generateName(), v5ClientEncoder)
+                                // backend outbound encoder: standard socks5 command request (Connect or UdP)
+                                pipeline.addLast(namer.generateName(), v5ClientEncoder)
                                         // illiad header
                                         .addLast(namer.generateName(), headerEncoder)
+                                        // backend inbound decoder: socks5 client decoder
+                                        .addLast(namer.generateName(), new V5ClientDecoder())
+                                        .addLast(namer.generateName(), new V5AckHandler(ctx.channel(), promise))
                                         .channel()
                                         .writeAndFlush(request).addListener((ChannelFutureListener) future2 -> {
                                             if (!future2.isSuccess()) {
