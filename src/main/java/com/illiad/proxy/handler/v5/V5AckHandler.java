@@ -6,7 +6,6 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.socksx.v5.Socks5CommandResponse;
 import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
 import io.netty.util.concurrent.Promise;
-
 import java.util.concurrent.ExecutionException;
 
 public class V5AckHandler extends SimpleChannelInboundHandler<Socks5CommandResponse> {
@@ -22,23 +21,23 @@ public class V5AckHandler extends SimpleChannelInboundHandler<Socks5CommandRespo
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Socks5CommandResponse response) throws ExecutionException, InterruptedException {
 
-        // wite response to frontend
-        frontend.writeAndFlush(response).addListener(future -> {
-            if (future.isSuccess()) {
-                // trigger promise as per message status
-                if (response.status() == Socks5CommandStatus.SUCCESS) {
+        if (response.status() == Socks5CommandStatus.SUCCESS) {
+            // wite response to frontend
+            frontend.writeAndFlush(response).addListener(future -> {
+                if (future.isSuccess()) {
                     ctx.pipeline().remove(this);
                     promise.setSuccess(ctx.channel());
                 } else {
-                    promise.setFailure(new Exception(response.status().toString()));
-                    ctx.fireExceptionCaught(new Exception(response.status().toString()));
+                    promise.setFailure(future.cause());
+                    ctx.fireExceptionCaught(future.cause());
+                    ctx.channel().close();
                 }
-            } else {
-                promise.setFailure(future.cause());
-                ctx.fireExceptionCaught(future.cause());
-                ctx.channel().close();
-            }
-        });
+            });
+        } else {
+            promise.setFailure(new Exception(response.status().toString()));
+            ctx.fireExceptionCaught(new Exception(response.status().toString()));
+        }
+
 
     }
 }
