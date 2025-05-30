@@ -41,6 +41,8 @@ def test_socks5_connect(proxy_host, proxy_port, target_host, target_port):
             return
 
         print("SOCKS5 connection successful")
+        print("Server response:")
+        print(response.decode('utf-8'))
 
     except Exception as e:
         print("Error testing SOCKS5 connection:", e)
