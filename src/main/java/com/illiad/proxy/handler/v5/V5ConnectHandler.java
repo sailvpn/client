@@ -1,7 +1,7 @@
 package com.illiad.proxy.handler.v5;
 
 import com.illiad.proxy.HandlerNamer;
-import com.illiad.proxy.codec.HeaderEncoder;
+import com.illiad.proxy.codec.v5.V5AddressDecoder;
 import com.illiad.proxy.codec.v5.V5ClientDecoder;
 import com.illiad.proxy.codec.v5.V5ClientEncoder;
 import com.illiad.proxy.config.Params;
@@ -22,18 +22,18 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
     private final Ssl ssl;
     private final Params params;
     private final HandlerNamer namer;
-    private final HeaderEncoder headerEncoder;
     private final V5ClientEncoder v5ClientEncoder;
+    private final V5AddressDecoder v5AddressDecoder;
     private final Utils utils;
     private final Bootstrap b = new Bootstrap();
 
-    public V5ConnectHandler(Ssl ssl, Params params, HandlerNamer namer, HeaderEncoder headerEncoder, V5ClientEncoder v5ClientEncoder, Utils utils) {
+    public V5ConnectHandler(Ssl ssl, Params params, HandlerNamer namer, V5ClientEncoder v5ClientEncoder, V5AddressDecoder v5AddressDecoder, Utils utils) {
 
         this.ssl = ssl;
         this.params = params;
         this.namer = namer;
-        this.headerEncoder = headerEncoder;
         this.v5ClientEncoder = v5ClientEncoder;
+        this.v5AddressDecoder = v5AddressDecoder;
         this.utils = utils;
     }
 
@@ -76,7 +76,8 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                 .option(ChannelOption.SO_KEEPALIVE, true)
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
-                    protected void initChannel(SocketChannel sc) {}
+                    protected void initChannel(SocketChannel sc) {
+                    }
                 })
                 // connect to the proxy server, and forward the Socks connect command message to the remote server
                 .connect(params.getRemoteHost(), params.getRemotePort())
@@ -91,10 +92,8 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                             if (future1.isSuccess()) {
                                 // backend outbound encoder: standard socks5 command request (Connect or UdP)
                                 pipeline.addLast(namer.generateName(), v5ClientEncoder)
-                                        // illiad header
-                                        .addLast(namer.generateName(), headerEncoder)
                                         // backend inbound decoder: socks5 client decoder
-                                        .addLast(namer.generateName(), new V5ClientDecoder())
+                                        .addLast(namer.generateName(), new V5ClientDecoder(v5AddressDecoder))
                                         .addLast(namer.generateName(), new V5AckHandler(ctx.channel(), promise))
                                         .channel()
                                         .writeAndFlush(request).addListener((ChannelFutureListener) future2 -> {

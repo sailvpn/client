@@ -1,5 +1,6 @@
 package com.illiad.proxy.codec.v5;
 
+import com.illiad.proxy.codec.HeaderEncoder;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandler.Sharable;
@@ -16,14 +17,17 @@ import org.springframework.stereotype.Component;
 @Sharable
 public class V5ClientEncoder extends MessageToByteEncoder<Socks5CommandRequest> {
 
+    private final HeaderEncoder headerEncoder;
     private final V5AddressEncoder v5AddressEncoder;
 
-    public V5ClientEncoder(V5AddressEncoder v5AddressEncoder) {
+    public V5ClientEncoder(HeaderEncoder headerEncoder, V5AddressEncoder v5AddressEncoder) {
+        this.headerEncoder = headerEncoder;
         this.v5AddressEncoder = v5AddressEncoder;
     }
 
     @Override
     protected void encode(ChannelHandlerContext ctx, Socks5CommandRequest request, ByteBuf out) {
+        headerEncoder.encodeHeader(out);
         out.writeByte(request.version().byteValue());
         out.writeByte(request.type().byteValue());
         out.writeByte(0x00);

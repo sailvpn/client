@@ -1,7 +1,6 @@
 package com.illiad.proxy.handler;
 
 import com.illiad.proxy.HandlerNamer;
-import com.illiad.proxy.codec.HeaderEncoder;
 import com.illiad.proxy.codec.v4.V4ServerDecoder;
 import com.illiad.proxy.codec.v4.V4ServerEncoder;
 import com.illiad.proxy.codec.v5.V5AddressDecoder;
@@ -36,22 +35,21 @@ public class VersionHandler extends ByteToMessageDecoder {
     private final Ssl ssl;
     private final Params params;
     private final HandlerNamer namer;
-    private final HeaderEncoder headerEncoder;
     private final V4ServerEncoder v4ServerEncoder;
     private final V5ClientEncoder v5ClientEncoder;
     private final V5ServerEncoder v5ServerEncoder;
     private final V4CommandHandler v4CommandHandler;
     private final Utils utils;
-    public VersionHandler(V5AddressDecoder v5AddressDecoder, Ssl ssl, Params params, HandlerNamer namer, HeaderEncoder headerEncoder, V4ServerEncoder v4ServerEncoder, V5ClientEncoder v5ClientEncoder, V4CommandHandler v4CommandHandler, V5ServerEncoder v5ServerEncoder, Utils utils) {
-        this.v5AddressDecoder = v5AddressDecoder;
+
+    public VersionHandler(Ssl ssl, Params params, HandlerNamer namer, V4ServerEncoder v4ServerEncoder, V5ClientEncoder v5ClientEncoder, V4CommandHandler v4CommandHandler, V5ServerEncoder v5ServerEncoder, V5AddressDecoder v5AddressDecoder, Utils utils) {
         this.ssl = ssl;
         this.params = params;
         this.namer = namer;
-        this.headerEncoder = headerEncoder;
         this.v4ServerEncoder = v4ServerEncoder;
         this.v5ClientEncoder = v5ClientEncoder;
         this.v4CommandHandler = v4CommandHandler;
         this.v5ServerEncoder = v5ServerEncoder;
+        this.v5AddressDecoder = v5AddressDecoder;
         this.utils = utils;
     }
 
@@ -77,7 +75,7 @@ public class VersionHandler extends ByteToMessageDecoder {
                 logKnownVersion(ctx, version);
                 p.addLast(namer.generateName(), v5ServerEncoder);
                 p.addLast(namer.generateName(), new V5InitReqDecoder());
-                p.addLast(namer.generateName(), new V5CommandHandler(v5AddressDecoder, ssl, params, namer, headerEncoder, v5ClientEncoder, utils));
+                p.addLast(namer.generateName(), new V5CommandHandler(ssl, params, namer, v5ClientEncoder, v5AddressDecoder, utils));
                 break;
             default:
                 logUnknownVersion(ctx, versionVal);

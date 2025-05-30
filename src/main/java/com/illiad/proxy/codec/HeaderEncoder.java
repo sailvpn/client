@@ -2,10 +2,6 @@ package com.illiad.proxy.codec;
 
 import com.illiad.proxy.security.Secret;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.MessageToByteEncoder;
-import io.netty.handler.codec.socksx.SocksMessage;
 import org.springframework.stereotype.Component;
 
 /**
@@ -16,8 +12,7 @@ import org.springframework.stereotype.Component;
  * if the encryption returns a variable-length signature, the length field contain the length of the signature only(length + cryptoType + signature).
  */
 @Component
-@ChannelHandler.Sharable
-public class HeaderEncoder extends MessageToByteEncoder<SocksMessage> {
+public class HeaderEncoder {
 
     private final static byte[] CRLF = new byte[]{0x0D, 0x0A};
     private final Secret secret;
@@ -26,8 +21,8 @@ public class HeaderEncoder extends MessageToByteEncoder<SocksMessage> {
         this.secret = secret;
     }
 
-    @Override
-    protected void encode(ChannelHandlerContext ctx, SocksMessage socksMessage, ByteBuf byteBuf) {
+
+    public void encodeHeader(ByteBuf byteBuf) {
 
         // get secret
         byte[] secretBytes;
@@ -54,8 +49,6 @@ public class HeaderEncoder extends MessageToByteEncoder<SocksMessage> {
         byteBuf.writeBytes(secretBytes);
         byteBuf.writeBytes(offset);
         byteBuf.writeBytes(CRLF);
-        ctx.write(socksMessage);
     }
-
 
 }

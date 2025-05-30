@@ -99,9 +99,7 @@ public final class V4ConnectHandler extends SimpleChannelInboundHandler<Socks4Co
                                 new V4ClientDecoder(),
                                 new V4AckHandler(promise),
                                 // backend outbound encoder
-                                v4ClientEncoder,
-                                // backend header encoder
-                                headerEncoder);
+                                v4ClientEncoder);
                     }
                 });
 

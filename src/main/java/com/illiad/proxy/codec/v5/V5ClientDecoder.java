@@ -8,7 +8,7 @@ import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.ReplayingDecoder;
 import io.netty.handler.codec.socksx.SocksVersion;
 import io.netty.handler.codec.socksx.v5.*;
-import org.springframework.beans.factory.annotation.Autowired;
+
 import java.util.List;
 
 /**
@@ -19,11 +19,12 @@ import java.util.List;
  */
 public class V5ClientDecoder extends ReplayingDecoder<V5ClientDecoder.State> {
 
-    @Autowired 
-    V5AddressDecoder v5AddressDecoder;
+    private V5AddressDecoder v5AddressDecoder;
 
-    public V5ClientDecoder() {
+    public V5ClientDecoder(V5AddressDecoder v5AddressDecoder) {
+
         super(State.INIT);
+        this.v5AddressDecoder = v5AddressDecoder;
     }
 
     @Override
