@@ -5,7 +5,6 @@ import com.illiad.proxy.codec.v5.V5AddressDecoder;
 import com.illiad.proxy.codec.v5.V5ClientDecoder;
 import com.illiad.proxy.codec.v5.V5ClientEncoder;
 import com.illiad.proxy.config.Params;
-import com.illiad.proxy.handler.RelayHandler;
 import com.illiad.proxy.handler.Utils;
 import com.illiad.proxy.security.Ssl;
 import io.netty.bootstrap.Bootstrap;
@@ -14,8 +13,6 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.socksx.v5.Socks5CommandRequest;
 import io.netty.handler.ssl.SslHandler;
-import io.netty.util.concurrent.FutureListener;
-import io.netty.util.concurrent.Promise;
 
 public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandRequest> {
 
@@ -39,36 +36,6 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
 
     @Override
     public void channelRead0(final ChannelHandlerContext ctx, final Socks5CommandRequest request) {
-
-        // define a promise to handle the connection to the remote server
-        Promise<Channel> promise = ctx.executor().newPromise();
-        promise.addListener((FutureListener<Channel>) future -> {
-            if (future.isSuccess()) {
-                final Channel frontend = ctx.channel();
-                final ChannelPipeline frontendPipeline = ctx.pipeline();
-                final Channel backend = future.get();
-                final ChannelPipeline backendPipeline = backend.pipeline();
-                // setup Socks direct channel relay between frontend and backend
-                frontendPipeline.addLast(new RelayHandler(backend, utils));
-                backendPipeline.addLast(new RelayHandler(frontend, utils));
-                String prefix = namer.getPrefix();
-                // remove all handlers except SslHandler from backendPipeline
-                for (String name : backendPipeline.names()) {
-                    if (name.startsWith(prefix)) {
-                        backendPipeline.remove(name);
-                    }
-                }
-                // remove all handlers except LoggingHandler from frontendPipeline
-                for (String name : frontendPipeline.names()) {
-                    if (name.startsWith(prefix)) {
-                        frontendPipeline.remove(name);
-                    }
-                }
-            } else {
-                utils.closeOnFlush(ctx.channel());
-                ctx.fireExceptionCaught(future.cause());
-            }
-        });
 
         b.group(ctx.channel().eventLoop())
                 .channel(NioSocketChannel.class)
@@ -94,25 +61,26 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                                 pipeline.addLast(namer.generateName(), v5ClientEncoder)
                                         // backend inbound decoder: socks5 client decoder
                                         .addLast(namer.generateName(), new V5ClientDecoder(v5AddressDecoder))
-                                        .addLast(namer.generateName(), new V5AckHandler(ctx.channel(), promise))
+                                        .addLast(namer.generateName(), new V5AckHandler(ctx, namer, utils))
                                         .channel()
                                         .writeAndFlush(request).addListener((ChannelFutureListener) future2 -> {
                                             if (!future2.isSuccess()) {
-                                                System.err.println("Failed to write request: " + future2.cause());
-                                                ctx.channel().close();
+                                                ctx.fireExceptionCaught(new Exception(future2.cause()));
                                                 utils.closeOnFlush(ch);
+                                                utils.closeOnFlush(ctx.channel());
                                             }
                                         });
                             } else {
-                                System.err.println("SSL Handshake failed: " + future1.cause());
-                                ch.close();
-                                ctx.channel().close(); // Close the channel on failure
+                                ctx.fireExceptionCaught(new Exception(future1.cause()));
+                                utils.closeOnFlush(ch);
+                                utils.closeOnFlush(ctx.channel()); // Close the channel on failure
                             }
                         });
                     } else {
                         // Close the connection if the connection attempt has failed.
-                        utils.closeOnFlush(ctx.channel());
                         ctx.fireExceptionCaught(future.cause());
+                        utils.closeOnFlush(future.channel());
+                        utils.closeOnFlush(ctx.channel());
                     }
                 });
     }
