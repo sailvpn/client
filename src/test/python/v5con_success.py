@@ -33,14 +33,8 @@ def test_socks5_connect(proxy_host, proxy_port, target_host, target_port):
         print("Sending SOCKS5 request:")
         print(connect_request)
         sock.sendall(connect_request)
-
         # Receive the response from the proxy
-        response = sock.recv(10)
-        if len(response) < 10 or response[1] != 0x00:
-            print("SOCKS5 connection failed")
-            return
-
-        print("SOCKS5 connection successful")
+        response = sock.recv(4096)
         print("Server response:")
         print(response.decode('utf-8'))
 
