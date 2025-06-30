@@ -1,10 +1,8 @@
 package com.illiad.proxy;
 
-import com.illiad.proxy.codec.v4.V4ServerEncoder;
 import com.illiad.proxy.codec.v5.V5ServerEncoder;
 import com.illiad.proxy.config.Params;
 import com.illiad.proxy.handler.VersionHandler;
-import com.illiad.proxy.handler.v4.V4CommandHandler;
 import com.illiad.proxy.handler.v5.V5CommandHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
@@ -23,10 +21,6 @@ class StarterTest {
 
     @Mock
     private Params params;
-    @Mock
-    private V4ServerEncoder v4ServerEncoder;
-    @Mock
-    private V4CommandHandler v4CommandHandler;
     @Mock
     private V5ServerEncoder v5ServerEncoder;
     @Mock
