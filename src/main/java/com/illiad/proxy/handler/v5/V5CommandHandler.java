@@ -41,7 +41,8 @@ public class V5CommandHandler extends SimpleChannelInboundHandler<Socks5Message>
             ctx.pipeline().addFirst(namer.generateName(), new V5CmdReqDecoder(this.v5AddressDecoder));
             ctx.write(new DefaultSocks5PasswordAuthResponse(Socks5PasswordAuthStatus.SUCCESS));
         } else if (socksRequest instanceof Socks5CommandRequest socks5CmdRequest) {
-            if (socks5CmdRequest.type() == Socks5CommandType.CONNECT) {
+            Socks5CommandType commandType = socks5CmdRequest.type();
+            if (commandType == Socks5CommandType.CONNECT || commandType == Socks5CommandType.UDP_ASSOCIATE) {
                 ctx.pipeline().addLast(namer.generateName(), new V5ConnectHandler(ssl, params, namer, v5ClientEncoder, v5AddressDecoder, utils));
                 ctx.pipeline().remove(this);
                 ctx.fireChannelRead(socksRequest);
