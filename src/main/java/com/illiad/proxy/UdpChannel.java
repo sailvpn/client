@@ -1,14 +1,12 @@
 package com.illiad.proxy;
 
-import io.netty.channel.Channel;
-import lombok.Data;
 import org.springframework.stereotype.Component;
+import java.nio.channels.DatagramChannel;
 
 /**
  * this class hold an instance of UDP relay channel on server side
  */
 @Component
-@Data
 public class UdpChannel {
-    private Channel channel = null;
+    public DatagramChannel dChannel = null;
 }
