@@ -1,5 +1,6 @@
 package com.illiad.proxy.codec.v5;
 
+import com.illiad.proxy.ParamBus;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
@@ -19,12 +20,12 @@ import java.util.List;
  */
 public class V5ClientDecoder extends ReplayingDecoder<V5ClientDecoder.State> {
 
-    private V5AddressDecoder v5AddressDecoder;
+    private final ParamBus bus;
 
-    public V5ClientDecoder(V5AddressDecoder v5AddressDecoder) {
+    public V5ClientDecoder(ParamBus bus) {
 
         super(State.INIT);
-        this.v5AddressDecoder = v5AddressDecoder;
+        this.bus = bus;
     }
 
     @Override
@@ -40,7 +41,7 @@ public class V5ClientDecoder extends ReplayingDecoder<V5ClientDecoder.State> {
                     final Socks5CommandStatus status = Socks5CommandStatus.valueOf(in.readByte());
                     in.skipBytes(1); // Reserved
                     final Socks5AddressType addrType = Socks5AddressType.valueOf(in.readByte());
-                    final String addr = v5AddressDecoder.decodeAddress(addrType, in);
+                    final String addr = bus.v5AddressDecoder.decodeAddress(addrType, in);
                     final int port = ByteBufUtil.readUnsignedShortBE(in);
 
                     out.add(new DefaultSocks5CommandResponse(status, addrType, addr, port));

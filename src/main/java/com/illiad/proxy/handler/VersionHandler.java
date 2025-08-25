@@ -1,13 +1,8 @@
 package com.illiad.proxy.handler;
 
-import com.illiad.proxy.HandlerNamer;
-import com.illiad.proxy.codec.v5.V5AddressDecoder;
-import com.illiad.proxy.codec.v5.V5ClientEncoder;
+import com.illiad.proxy.ParamBus;
 import com.illiad.proxy.codec.v5.V5InitReqDecoder;
-import com.illiad.proxy.codec.v5.V5ServerEncoder;
-import com.illiad.proxy.config.Params;
 import com.illiad.proxy.handler.v5.V5CommandHandler;
-import com.illiad.proxy.security.Ssl;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
@@ -25,23 +20,10 @@ import java.util.List;
 public class VersionHandler extends ByteToMessageDecoder {
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(VersionHandler.class);
+    private final ParamBus bus;
 
-    private final V5AddressDecoder v5AddressDecoder;
-    private final Ssl ssl;
-    private final Params params;
-    private final HandlerNamer namer;
-    private final V5ClientEncoder v5ClientEncoder;
-    private final V5ServerEncoder v5ServerEncoder;
-    private final Utils utils;
-
-    public VersionHandler(Ssl ssl, Params params, HandlerNamer namer, V5ClientEncoder v5ClientEncoder, V5ServerEncoder v5ServerEncoder, V5AddressDecoder v5AddressDecoder, Utils utils) {
-        this.ssl = ssl;
-        this.params = params;
-        this.namer = namer;
-        this.v5ClientEncoder = v5ClientEncoder;
-        this.v5ServerEncoder = v5ServerEncoder;
-        this.v5AddressDecoder = v5AddressDecoder;
-        this.utils = utils;
+    public VersionHandler(ParamBus bus) {
+        this.bus = bus;
     }
 
     @Override
@@ -58,9 +40,9 @@ public class VersionHandler extends ByteToMessageDecoder {
         switch (version) {
             case SOCKS5:
                 logKnownVersion(ctx, version);
-                p.addLast(namer.generateName(), v5ServerEncoder);
-                p.addLast(namer.generateName(), new V5InitReqDecoder());
-                p.addLast(namer.generateName(), new V5CommandHandler(ssl, params, namer, v5ClientEncoder, v5AddressDecoder, utils));
+                p.addLast(bus.namer.generateName(), bus.v5ServerEncoder);
+                p.addLast(bus.namer.generateName(), new V5InitReqDecoder());
+                p.addLast(bus.namer.generateName(), new V5CommandHandler(bus));
                 break;
             case SOCKS4a:
             default:

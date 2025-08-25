@@ -1,8 +1,7 @@
 package com.illiad.proxy.handler.v5;
 
-import com.illiad.proxy.HandlerNamer;
+import com.illiad.proxy.ParamBus;
 import com.illiad.proxy.handler.RelayHandler;
-import com.illiad.proxy.handler.Utils;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
@@ -15,13 +14,11 @@ import java.util.concurrent.ExecutionException;
 public class V5AckHandler extends SimpleChannelInboundHandler<Socks5CommandResponse> {
 
     private final ChannelHandlerContext frontendCtx;
-    private final HandlerNamer namer;
-    private final Utils utils;
+    private final ParamBus bus;
 
-    public V5AckHandler(ChannelHandlerContext frontendCtx, HandlerNamer namer, Utils utils) {
+    public V5AckHandler(ChannelHandlerContext frontendCtx, ParamBus bus) {
         this.frontendCtx = frontendCtx;
-        this.namer = namer;
-        this.utils = utils;
+        this.bus = bus;
     }
 
     @Override
@@ -36,9 +33,9 @@ public class V5AckHandler extends SimpleChannelInboundHandler<Socks5CommandRespo
                     final Channel backend = ctx.channel();
                     final ChannelPipeline backendPipeline = backend.pipeline();
                     // setup Socks direct channel relay between frontend and backend
-                    frontendPipeline.addLast(new RelayHandler(backend, utils));
-                    backendPipeline.addLast(new RelayHandler(frontend, utils));
-                    String prefix = namer.getPrefix();
+                    frontendPipeline.addLast(new RelayHandler(backend, bus.utils));
+                    backendPipeline.addLast(new RelayHandler(frontend, bus.utils));
+                    String prefix = bus.namer.getPrefix();
                     // remove all handlers except SslHandler from backendPipeline
                     for (String name : backendPipeline.names()) {
                         if (name.startsWith(prefix)) {
@@ -53,16 +50,15 @@ public class V5AckHandler extends SimpleChannelInboundHandler<Socks5CommandRespo
                     }
                 } else {
                     frontendCtx.fireExceptionCaught(future.cause());
-                    utils.closeOnFlush(frontend);
-                    utils.closeOnFlush(ctx.channel());
+                    bus.utils.closeOnFlush(frontend);
+                    bus.utils.closeOnFlush(ctx.channel());
                 }
             });
         } else {
             frontendCtx.fireExceptionCaught(new Exception(response.status().toString()));
-            utils.closeOnFlush(frontendCtx.channel());
-            utils.closeOnFlush(ctx.channel());
+            bus.utils.closeOnFlush(frontendCtx.channel());
+            bus.utils.closeOnFlush(ctx.channel());
         }
-
     }
 }
 
