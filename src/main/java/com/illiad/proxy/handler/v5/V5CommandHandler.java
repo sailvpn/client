@@ -32,7 +32,7 @@ public class V5CommandHandler extends SimpleChannelInboundHandler<Socks5Message>
                 ctx.pipeline().remove(this);
                 ctx.fireChannelRead(socksRequest);
             } else if (commandType == Socks5CommandType.UDP_ASSOCIATE) {
-                ctx.pipeline().addLast(new UdpAssociateHandler(bus));
+                ctx.pipeline().addLast(new AssociateHandler(bus));
                 ctx.pipeline().remove(this);
                 ctx.fireChannelRead(socksRequest);
             } else if (commandType == Socks5CommandType.BIND) {
