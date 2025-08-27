@@ -1,17 +1,13 @@
 package com.illiad.proxy.handler.v5.udp;
 
 import com.illiad.proxy.ParamBus;
-import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.ByteBuf;
+import com.illiad.proxy.handler.v5.FwdAsoHandler;
 import io.netty.channel.*;
-import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.DatagramPacket;
-import io.netty.channel.socket.nio.NioDatagramChannel;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
-import java.util.Iterator;
 
 public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket> {
 
@@ -24,84 +20,40 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, DatagramPacket packet) throws UnknownHostException {
 
-        // get the sender's socketaddress
-        InetSocketAddress sender = packet.sender();
         Aso aso = bus.asos.getAsoByBind(ctx.channel());
         if (aso != null) {
+
             InetAddress asoRemoteAddr = ((InetSocketAddress) (aso.getAssociate().remoteAddress())).getAddress();
+            InetSocketAddress sender = packet.sender();
             // --- Security Check (RFC 1928) ---
             // make sure the DatagramPacket had come from the same address (IP)
             // that had initiated the UDP_ASSOCIATE on a TCP channel
-            if (sender.getAddress().equals(asoRemoteAddr)) {
-                // associate source
-                aso.setSource(sender);
+            if (sender != null && sender.getAddress().equals(asoRemoteAddr)) {
+                // store the source address
+                if(aso.getSource() == null) {
+                    aso.setSource(sender);
+                }
+                // the 1st leg's forward is the 2nd legs' bind, and should be only 1 channel if exists
+                if (aso.getForwards().isEmpty() || aso.getForwards().get(0) == null || !aso.getForwards().get(0).isActive()) {
+                    // no valid forward, proceed to initiate UDP_ASSOCIATE towards 2nd leg
+                    ctx.pipeline().addLast(new FwdAsoHandler(bus));
+                    ctx.fireChannelRead(packet);
+                } else {
 
-                ByteBuf buf = packet.content();
-                buf.skipBytes(3); // RSV (2 bytes) + FRAG (1 byte)
-                byte atyp = buf.readByte();
-                InetSocketAddress destAddr = bus.utils.parseAddress(buf, atyp);
-                if (destAddr != null) {
-
-                    ByteBuf data = buf.slice(buf.readerIndex(), buf.readableBytes());
-                    DatagramPacket forwardPacket = new DatagramPacket(data.retain(), destAddr);
-
-                    Channel forward = null;
-                    // acquire forward from aso's forward list by destAddr
-                    for (Channel fwd : aso.getForwards()) {
-                        if (destAddr.equals(fwd.remoteAddress())) {
-                            forward = fwd;
-                            break;
-                        }
-                    }
-                    // already has an ephemeral socket to the final UDP server
-                    if (forward != null && forward.isActive()) {
-                        forward.writeAndFlush(forwardPacket)
-                                .addListener((ChannelFutureListener) future1 -> {
-                                    if (!future1.isSuccess()) {
-                                        Channel failedForward = future1.channel();
-                                        // close forward channel if write failed
-                                        failedForward.close();
-                                        // remove the corresponding forward
-                                        Iterator<Channel> it = aso.getForwards().iterator();
-                                        while (it.hasNext()) {
-                                            Channel fwd = it.next();
-                                            if (failedForward.id().equals(fwd.id())) {
-                                                it.remove();
-                                                break;
-                                            }
-                                        }
-                                    }
-                                });
-                    } else {
-
-                        // establish an ephemeral socket to the final UDP server
-                        Bootstrap forwardStrap = new Bootstrap();
-                        forwardStrap.group(ctx.channel().eventLoop())
-                                .channel(NioDatagramChannel.class)
-                                // Enable broadcasting if needed
-                                .option(ChannelOption.SO_BROADCAST, true)
-                                .handler(new ChannelInitializer<DatagramChannel>() {
-                                    @Override
-                                    protected void initChannel(DatagramChannel ch) {
-                                        ch.pipeline().addLast(new ResHandler(bus));
-                                    }
-                                }).connect(destAddr).addListener((ChannelFutureListener) future -> {
-                                    if (future.isSuccess()) {
-                                        Channel fwd = future.channel();
-                                        fwd.writeAndFlush(forwardPacket)
-                                                .addListener((ChannelFutureListener) future1 -> {
-                                                    if (future1.isSuccess()) {
-                                                        // associate forward ephemeral channel to the aso
-                                                        aso.getForwards().add(fwd);
-                                                    } else {
-                                                        fwd.close();
-                                                    }
-                                                });
-                                    } else {
-                                        future.channel().close();
-                                    }
-                                });
-                    }
+                    // get forward(2nd leg's bind), and relay the DataGramPacket
+                    Channel forward = aso.getForwards().get(0);
+                    // form a new DataGramPacket, with the orignal SOCKS5 UDP packet(from client) as content, 2nd leg's bind as recepient, 1st leg's bind as sender
+                    DatagramPacket fwdPacket = new DatagramPacket(packet.content().retain(), (InetSocketAddress) forward.remoteAddress(), (InetSocketAddress) ctx.channel().localAddress());
+                    forward.writeAndFlush(fwdPacket)
+                            .addListener((ChannelFutureListener) future1 -> {
+                                if (!future1.isSuccess()) {
+                                    Channel failedForward = future1.channel();
+                                    // close forward channel if write failed
+                                    failedForward.close();
+                                    // remove the corresponding forward
+                                    aso.getForwards().remove(0);
+                                }
+                            });
                 }
             }
         }
