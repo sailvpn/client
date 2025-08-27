@@ -18,7 +18,7 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, DatagramPacket packet) throws UnknownHostException {
+    protected void channelRead0(ChannelHandlerContext ctx, DatagramPacket packet) {
 
         Aso aso = bus.asos.getAsoByBind(ctx.channel());
         if (aso != null) {
