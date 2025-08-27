@@ -7,7 +7,6 @@ import io.netty.channel.socket.DatagramPacket;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 
 public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket> {
 
