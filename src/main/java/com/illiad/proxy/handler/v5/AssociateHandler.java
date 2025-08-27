@@ -15,6 +15,9 @@ import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
 
 import java.net.InetSocketAddress;
 
+/**
+ * UDP_ASSOCIATE handler on the client side
+ */
 public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandRequest> {
 
     private final ParamBus bus;
@@ -26,10 +29,8 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
     @Override
     public void channelRead0(final ChannelHandlerContext ctx, final Socks5CommandRequest request) {
 
-        // Create a new UDP relay channel
-        EventLoopGroup group = new NioEventLoopGroup(2);
         Bootstrap udpBootstrap = new Bootstrap();
-        udpBootstrap.group(group)
+        udpBootstrap.group(ctx.channel().eventLoop())
                 .channel(NioDatagramChannel.class)
                 // Enable broadcasting if needed
                 .option(ChannelOption.SO_BROADCAST, true)
@@ -39,11 +40,11 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         ch.pipeline().addLast(new UdpRelayHandler(bus));
                     }
                 })
-                .bind(bus.params.getUdpHost(), 0)
+                .bind(bus.params.getUdpHost(), bus.utils.IPV4_ZERO_PORT)
                 .addListener((ChannelFutureListener) future -> {
                     if (future.isSuccess()) {
                         Channel bind = future.channel();
-                        // Register the new UDP associate-bind-remote_address(IP) association in the binds list
+                        // Register the new UDP associate-bind association in the binds list
                         bus.asos.addAso(new Aso(ctx.channel(), bind));
                         InetSocketAddress localAddr = (InetSocketAddress) bind.localAddress();
                         String host = localAddr.getHostString();
@@ -52,13 +53,13 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
                                 Socks5CommandStatus.SUCCESS,
                                 bus.utils.addressType(host),
                                 host,
-                                ((InetSocketAddress) future.channel().localAddress()).getPort()
+                                localAddr.getPort()
                         );
                         // Write the response to the client
                         ctx.channel().writeAndFlush(response);
                         ctx.pipeline().addLast(new CloseHandler(bus));
                         ctx.pipeline().remove(this);
-                        // remove all handlers except , SslHandler from frontendPipeline
+                        // remove all handlers from frontendPipeline
                         String prefix = bus.namer.getPrefix();
                         ChannelPipeline pipeline = ctx.pipeline();
                         for (String name : pipeline.names()) {
