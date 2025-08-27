@@ -12,6 +12,10 @@ import java.net.*;
 
 @Component
 public class Utils {
+
+    public final String IPV4_ZERO_Addr = "0.0.0.0";
+    public final int IPV4_ZERO_PORT = 0;
+
     /**
      * Closes the specified channel after all queued write requests are flushed.
      */
