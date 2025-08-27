@@ -128,4 +128,19 @@ public class Asos {
         return null;
     }
 
+    public Aso removeAsobyFwdAssociate(Channel fwdAssociate) {
+        if (fwdAssociate != null) {
+            ChannelId id = fwdAssociate.id();
+            Iterator<Aso> it = pool.iterator();
+            while (it.hasNext()) {
+                Aso aso = it.next();
+                if (id.equals(aso.getFwdAssociate().id())) {
+                    it.remove();
+                    return aso;
+                }
+            }
+        }
+        return null;
+    }
+
 }
