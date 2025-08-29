@@ -67,6 +67,8 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
                                 pipeline.remove(name);
                             }
                         }
+                    } else {
+                        ctx.fireExceptionCaught(new Exception(bus.utils.associateFailed));
                     }
                 });
     }
