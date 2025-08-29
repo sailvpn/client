@@ -90,13 +90,14 @@ def main():
     udp_sock.settimeout(600)
     # udp_sock.settimeout(5)
     packet = socks5_udp_packet(TARGET_HOST, TARGET_PORT, DNS_QUERY)
-    udp_sock.sendto(packet, (relay_ip, relay_port))
-    try:
-        data, addr = udp_sock.recvfrom(4096)
-        parsed = parse_socks5_udp_packet(data)
-        print(f'Response from {addr}: {parsed}')
-    except socket.timeout:
-        print('No response received (timeout)')
+    for i in range(5):
+        udp_sock.sendto(packet, (relay_ip, relay_port))
+        try:
+            data, addr = udp_sock.recvfrom(4096)
+            parsed = parse_socks5_udp_packet(data)
+            print(f'Response from {addr}: {parsed}')
+        except socket.timeout:
+            print('No response received (timeout)')
     udp_sock.close()
 
 if __name__ == '__main__':
