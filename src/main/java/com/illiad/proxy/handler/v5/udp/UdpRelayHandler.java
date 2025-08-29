@@ -4,6 +4,7 @@ import com.illiad.proxy.ParamBus;
 import com.illiad.proxy.handler.v5.FwdAsoHandler;
 import io.netty.channel.*;
 import io.netty.channel.socket.DatagramPacket;
+import io.netty.util.ReferenceCountUtil;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -13,6 +14,7 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
     private final ParamBus bus;
 
     public UdpRelayHandler(ParamBus bus) {
+        super(false);
         this.bus = bus;
     }
 
@@ -29,7 +31,7 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
             // that had initiated the UDP_ASSOCIATE on a TCP channel
             if (sender != null && sender.getAddress().equals(asoRemoteAddr)) {
                 // store the source address
-                if(aso.getSource() == null) {
+                if (aso.getSource() == null) {
                     aso.setSource(sender);
                 }
                 // the 1st leg's forward is the 2nd legs' bind, and should be only 1 channel if exists
@@ -38,13 +40,13 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
                     ctx.pipeline().addLast(new FwdAsoHandler(bus));
                     ctx.fireChannelRead(packet);
                 } else {
-
                     // get forward(2nd leg's bind), and relay the DataGramPacket
                     Channel forward = aso.getForwards().get(0);
                     // form a new DataGramPacket, with the orignal SOCKS5 UDP packet(from client) as content, 2nd leg's bind as recepient, 1st leg's bind as sender
-                    DatagramPacket fwdPacket = new DatagramPacket(packet.content().retain(), (InetSocketAddress) forward.remoteAddress(), (InetSocketAddress) ctx.channel().localAddress());
+                    DatagramPacket fwdPacket = new DatagramPacket(packet.retain().content(), (InetSocketAddress) forward.remoteAddress(), (InetSocketAddress) ctx.channel().localAddress());
                     forward.writeAndFlush(fwdPacket)
                             .addListener((ChannelFutureListener) future1 -> {
+                                ReferenceCountUtil.release(packet);
                                 if (!future1.isSuccess()) {
                                     Channel failedForward = future1.channel();
                                     // close forward channel if write failed
@@ -54,7 +56,11 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
                                 }
                             });
                 }
+            } else {
+                ReferenceCountUtil.release(packet);
             }
+        } else {
+            ReferenceCountUtil.release(packet);
         }
 
     }

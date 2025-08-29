@@ -11,6 +11,7 @@ import io.netty.handler.codec.socksx.v5.DefaultSocks5CommandRequest;
 import io.netty.handler.codec.socksx.v5.Socks5AddressType;
 import io.netty.handler.codec.socksx.v5.Socks5CommandType;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.ReferenceCountUtil;
 
 /**
  * UDP_ASSOCIATE handler facing the upstream SOCKS5 server
@@ -20,6 +21,7 @@ public class FwdAsoHandler extends SimpleChannelInboundHandler<DatagramPacket> {
     private final Bootstrap b = new Bootstrap();
 
     public FwdAsoHandler(ParamBus bus) {
+        super(false);
         this.bus = bus;
     }
 
@@ -50,22 +52,25 @@ public class FwdAsoHandler extends SimpleChannelInboundHandler<DatagramPacket> {
                                 pipeline.addLast(bus.namer.generateName(), bus.v5ClientEncoder)
                                         // backend inbound decoder: socks5 client decoder
                                         .addLast(bus.namer.generateName(), new V5ClientDecoder(bus))
-                                        .addLast(bus.namer.generateName(), new FwdAsoAckHandler(bus, packet))
+                                        .addLast(bus.namer.generateName(), new FwdAsoAckHandler(bus, packet.retain()))
                                         .channel()
                                         .writeAndFlush(asoReq).addListener((ChannelFutureListener) future2 -> {
                                             if (!future2.isSuccess()) {
+                                                ReferenceCountUtil.release(packet);
                                                 ctx.fireExceptionCaught(new Exception(future2.cause()));
                                                 bus.utils.closeOnFlush(ch);
                                                 bus.utils.closeOnFlush(ctx.channel());
                                             }
                                         });
                             } else {
+                                ReferenceCountUtil.release(packet);
                                 ctx.fireExceptionCaught(new Exception(future1.cause()));
                                 bus.utils.closeOnFlush(ch);
                                 bus.utils.closeOnFlush(ctx.channel()); // Close the channel on failure
                             }
                         });
                     } else {
+                        ReferenceCountUtil.release(packet);
                         // Close the connection if the connection attempt has failed.
                         ctx.fireExceptionCaught(future.cause());
                         bus.utils.closeOnFlush(future.channel());
