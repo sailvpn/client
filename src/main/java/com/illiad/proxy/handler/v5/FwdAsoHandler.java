@@ -4,6 +4,7 @@ import com.illiad.proxy.ParamBus;
 import com.illiad.proxy.codec.v5.V5ClientDecoder;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
+import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -26,8 +27,9 @@ public class FwdAsoHandler extends SimpleChannelInboundHandler<DatagramPacket> {
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, DatagramPacket packet) throws Exception {
-        b.group(ctx.channel().eventLoop())
+    protected void channelRead0(ChannelHandlerContext ctx, DatagramPacket packet) {
+        EventLoopGroup asoEventLoop = new NioEventLoopGroup(2);
+        b.group(asoEventLoop)
                 .channel(NioSocketChannel.class)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
                 .option(ChannelOption.SO_KEEPALIVE, true)
@@ -52,7 +54,7 @@ public class FwdAsoHandler extends SimpleChannelInboundHandler<DatagramPacket> {
                                 pipeline.addLast(bus.namer.generateName(), bus.v5ClientEncoder)
                                         // backend inbound decoder: socks5 client decoder
                                         .addLast(bus.namer.generateName(), new V5ClientDecoder(bus))
-                                        .addLast(bus.namer.generateName(), new FwdAsoAckHandler(bus, packet.retain()))
+                                        .addLast(bus.namer.generateName(), new FwdAsoAckHandler(bus, packet))
                                         .channel()
                                         .writeAndFlush(asoReq).addListener((ChannelFutureListener) future2 -> {
                                             if (!future2.isSuccess()) {

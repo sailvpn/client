@@ -22,8 +22,7 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
     protected void channelRead0(ChannelHandlerContext ctx, DatagramPacket packet) {
 
         Aso aso = bus.asos.getAsoByBind(ctx.channel());
-        if (aso != null) {
-
+        if (packet != null && aso != null) {
             InetAddress asoRemoteAddr = ((InetSocketAddress) (aso.getAssociate().remoteAddress())).getAddress();
             InetSocketAddress sender = packet.sender();
             // --- Security Check (RFC 1928) ---
@@ -43,18 +42,19 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
                     // get forward(2nd leg's bind), and relay the DataGramPacket
                     Channel forward = aso.getForwards().get(0);
                     // form a new DataGramPacket, with the orignal SOCKS5 UDP packet(from client) as content, 2nd leg's bind as recepient, 1st leg's bind as sender
-                    DatagramPacket fwdPacket = new DatagramPacket(packet.retain().content(), (InetSocketAddress) forward.remoteAddress(), (InetSocketAddress) ctx.channel().localAddress());
+                    DatagramPacket fwdPacket = new DatagramPacket(packet.content(), (InetSocketAddress) forward.remoteAddress(), (InetSocketAddress) ctx.channel().localAddress());
                     forward.writeAndFlush(fwdPacket)
                             .addListener((ChannelFutureListener) future1 -> {
-                                ReferenceCountUtil.release(packet);
-                                if (!future1.isSuccess()) {
-                                    Channel failedForward = future1.channel();
-                                    // close forward channel if write failed
-                                    failedForward.close();
-                                    // remove the corresponding forward
-                                    aso.getForwards().remove(0);
-                                }
-                            });
+                                        ReferenceCountUtil.release(packet);
+                                        if (!future1.isSuccess()) {
+                                            Channel failedForward = future1.channel();
+                                            // close forward channel if write failed
+                                            failedForward.close();
+                                            // remove the corresponding forward
+                                            aso.getForwards().remove(0);
+                                        }
+                                    }
+                            );
                 }
             } else {
                 ReferenceCountUtil.release(packet);
