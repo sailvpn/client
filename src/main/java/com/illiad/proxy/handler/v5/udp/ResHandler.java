@@ -23,7 +23,7 @@ public class ResHandler extends SimpleChannelInboundHandler<DatagramPacket> {
                 Channel bind = aso.getBind();
                 if (bind != null && bind.isActive()) {
                     // form a new response with the source(client) as recipient, bind local address as sender
-                    DatagramPacket response = new DatagramPacket(res.content(), aso.getSource(), (InetSocketAddress) bind.localAddress());
+                    DatagramPacket response = new DatagramPacket(res.content().retain(), aso.getSource(), (InetSocketAddress) bind.localAddress());
                     bind.writeAndFlush(response);
                 }
 
