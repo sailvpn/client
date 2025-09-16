@@ -90,7 +90,7 @@ def main():
     udp_sock.settimeout(600)
     # udp_sock.settimeout(5)
     packet = socks5_udp_packet(TARGET_HOST, TARGET_PORT, DNS_QUERY)
-    for i in range(5):
+    for i in range(10):
         udp_sock.sendto(packet, (relay_ip, relay_port))
         try:
             data, addr = udp_sock.recvfrom(4096)
