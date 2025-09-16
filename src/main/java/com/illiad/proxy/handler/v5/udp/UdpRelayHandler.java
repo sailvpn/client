@@ -45,7 +45,6 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
                     DatagramPacket fwdPacket = new DatagramPacket(packet.content(), (InetSocketAddress) forward.remoteAddress(), (InetSocketAddress) ctx.channel().localAddress());
                     forward.writeAndFlush(fwdPacket)
                             .addListener((ChannelFutureListener) future1 -> {
-                                        ReferenceCountUtil.release(packet);
                                         if (!future1.isSuccess()) {
                                             Channel failedForward = future1.channel();
                                             // close forward channel if write failed
