@@ -12,7 +12,6 @@ import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
 import io.netty.util.ReferenceCountUtil;
 
 import java.net.InetSocketAddress;
-import java.util.concurrent.ExecutionException;
 
 public class FwdAsoAckHandler extends SimpleChannelInboundHandler<Socks5CommandResponse> {
 
@@ -27,7 +26,7 @@ public class FwdAsoAckHandler extends SimpleChannelInboundHandler<Socks5CommandR
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, Socks5CommandResponse res) throws ExecutionException, InterruptedException {
+    protected void channelRead0(ChannelHandlerContext ctx, Socks5CommandResponse res) {
 
         if (packet != null && res != null && res.status() == Socks5CommandStatus.SUCCESS) {
 
@@ -88,6 +87,7 @@ public class FwdAsoAckHandler extends SimpleChannelInboundHandler<Socks5CommandR
                 bus.utils.closeOnFlush(ctx.channel());
             }
         } else {
+            assert res != null;
             ctx.fireExceptionCaught(new Exception(res.status().toString()));
             ReferenceCountUtil.release(packet);
             ReferenceCountUtil.release(res);
