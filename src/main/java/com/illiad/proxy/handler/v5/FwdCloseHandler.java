@@ -2,14 +2,13 @@ package com.illiad.proxy.handler.v5;
 
 import com.illiad.proxy.ParamBus;
 import com.illiad.proxy.handler.v5.udp.Aso;
+import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-
 /**
  * this handler is attached to the forward associate (TCP) channel, it closes the corresponding
  * forward UDP channel
  */
-public class FwdCloseHandler extends ChannelInboundHandlerAdapter {
+public class FwdCloseHandler extends ChannelDuplexHandler {
     private final ParamBus bus;
 
     public FwdCloseHandler(ParamBus bus) {
@@ -21,6 +20,10 @@ public class FwdCloseHandler extends ChannelInboundHandlerAdapter {
      * otherwise the tcp channel will be closed(thus the UDP relay channel) long before debugging finished
      *
      */
+
+    /**
+     * IMPORTANT: this event will close forward UDP channel before any (UDP) message was forwarded
+     *
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
 
@@ -34,6 +37,7 @@ public class FwdCloseHandler extends ChannelInboundHandlerAdapter {
         }
         ctx.close();
     }
+    **/
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {

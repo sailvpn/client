@@ -3,14 +3,14 @@ package com.illiad.proxy.handler.v5;
 import com.illiad.proxy.ParamBus;
 import com.illiad.proxy.handler.v5.udp.Aso;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 
 /**
  * this handler is attached to the associate (TCP) channel, it closes the corresponding
  * UDP bind channel and all those forward channels when the associate channel is closed or exception
  */
-public class CloseHandler extends ChannelInboundHandlerAdapter {
+public class CloseHandler extends ChannelDuplexHandler {
     private final ParamBus bus;
 
     public CloseHandler(ParamBus bus) {
@@ -22,6 +22,10 @@ public class CloseHandler extends ChannelInboundHandlerAdapter {
      * otherwise the tcp channel will be closed(thus the UDP relay channel) long before debugging finished
      *
      */
+
+    /**
+     * IMPORTANT: this event will close the UDP relay channel before any (UDP)message was relayed
+     *
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
 
@@ -41,6 +45,8 @@ public class CloseHandler extends ChannelInboundHandlerAdapter {
         }
         ctx.close();
     }
+
+     **/
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
