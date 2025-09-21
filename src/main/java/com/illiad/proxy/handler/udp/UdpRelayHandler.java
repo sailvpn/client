@@ -1,4 +1,4 @@
-package com.illiad.proxy.handler.v5.udp;
+package com.illiad.proxy.handler.udp;
 
 import com.illiad.proxy.ParamBus;
 import com.illiad.proxy.handler.v5.FwdAsoHandler;

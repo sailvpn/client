@@ -1,4 +1,4 @@
-package com.illiad.proxy.handler.v5.udp;
+package com.illiad.proxy.handler.udp;
 
 import io.netty.channel.Channel;
 import lombok.Data;

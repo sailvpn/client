@@ -5,7 +5,7 @@ import com.illiad.proxy.codec.v5.V5ClientEncoder;
 import com.illiad.proxy.codec.v5.V5ServerEncoder;
 import com.illiad.proxy.config.Params;
 import com.illiad.proxy.handler.Utils;
-import com.illiad.proxy.handler.v5.udp.Asos;
+import com.illiad.proxy.handler.udp.Asos;
 import com.illiad.proxy.security.Secret;
 import com.illiad.proxy.security.Ssl;
 import org.springframework.stereotype.Component;

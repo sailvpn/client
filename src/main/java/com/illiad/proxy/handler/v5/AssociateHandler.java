@@ -1,11 +1,10 @@
 package com.illiad.proxy.handler.v5;
 
 import com.illiad.proxy.ParamBus;
-import com.illiad.proxy.handler.v5.udp.Aso;
-import com.illiad.proxy.handler.v5.udp.UdpRelayHandler;
+import com.illiad.proxy.handler.udp.Aso;
+import com.illiad.proxy.handler.udp.UdpRelayHandler;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.handler.codec.socksx.v5.DefaultSocks5CommandResponse;
