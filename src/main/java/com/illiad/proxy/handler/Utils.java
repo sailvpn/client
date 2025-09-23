@@ -16,6 +16,8 @@ public class Utils {
     public final String IPV4_ZERO_Addr = "0.0.0.0";
     public final int IPV4_ZERO_PORT = 0;
     public final String associateFailed = "Creating binding failed";
+    public final int DTLS_ENCRYPTION_OVERHEAD = 128; // Estimated overhead for DTLS encryption
+    public final byte[] HI = "Hi".getBytes();
 
     /**
      * Closes the specified channel after all queued write requests are flushed.
