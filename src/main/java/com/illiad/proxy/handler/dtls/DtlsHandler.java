@@ -7,6 +7,10 @@ import io.netty.channel.*;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.util.concurrent.DefaultPromise;
+import io.netty.util.concurrent.EventExecutor;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.Promise;
 
 import javax.net.ssl.*;
 import java.net.InetSocketAddress;
@@ -18,15 +22,23 @@ import java.nio.ByteBuffer;
  */
 public class DtlsHandler extends ChannelDuplexHandler {
     private final ParamBus bus;
-    private final ChannelPromise handshakeFuture;
+    private volatile ChannelHandlerContext context;
+    private Promise<Channel> handshakePromise = new LazyChannelPromise();
     private final SSLEngine sslEngine;
     private boolean handshakeComplete = false;
 
     public DtlsHandler(ParamBus bus, InetSocketAddress remoteAddress, ChannelPromise handshakeFuture) {
         this.bus = bus;
-        this.handshakeFuture = handshakeFuture;
         this.sslEngine = bus.dtls.sslCtx.createSSLEngine(remoteAddress.getHostString(), remoteAddress.getPort());
         this.sslEngine.setUseClientMode(true);
+    }
+
+    @Override
+    public void handlerAdded(final ChannelHandlerContext ctx) throws Exception {
+        this.context = ctx;
+        if (!handshakePromise.isDone()) {
+            handshakePromise.setSuccess(ctx.channel());
+        }
     }
 
     @Override
@@ -47,8 +59,13 @@ public class DtlsHandler extends ChannelDuplexHandler {
                 ByteBuf buf = Unpooled.wrappedBuffer(net);
                 ctx.writeAndFlush(new DatagramPacket(buf, ((InetSocketAddress) ctx.channel().remoteAddress())));
             }
+        }
+        if (status == SSLEngineResult.Status.CLOSED) {
+            ctx.fireExceptionCaught(new Exception(status.name()));
+            ctx.close();
         } else {
             ctx.fireExceptionCaught(new Exception(status.name()));
+            // Wait for more data
         }
     }
 
@@ -77,10 +94,9 @@ public class DtlsHandler extends ChannelDuplexHandler {
         } else if (status == SSLEngineResult.Status.CLOSED) {
             ctx.fireExceptionCaught(new Exception(status.name()));
             ctx.close();
-            return;
         } else {
             ctx.fireExceptionCaught(new Exception(status.name()));
-            return; // Wait for more data
+            // Wait for more data
         }
     }
 
@@ -98,12 +114,12 @@ public class DtlsHandler extends ChannelDuplexHandler {
                     if (nwStatus == SSLEngineResult.Status.OK) {
                         hsStatus = unwrap.getHandshakeStatus();
                     } else if (nwStatus == SSLEngineResult.Status.CLOSED) {
-                        handshakeFuture.setFailure(new Exception(nwStatus.name()));
+                        handshakePromise.setFailure(new Exception(nwStatus.name()));
                         ctx.fireExceptionCaught(new Exception(nwStatus.name()));
                         ctx.close();
                         return;
                     } else {
-                        handshakeFuture.setFailure(new Exception(nwStatus.name()));
+                        handshakePromise.setFailure(new Exception(nwStatus.name()));
                         ctx.fireExceptionCaught(new Exception(nwStatus.name()));
                         return; // Wait for more data
                     }
@@ -118,12 +134,12 @@ public class DtlsHandler extends ChannelDuplexHandler {
                         // packet.sender become the recipient, packet.recipient become the sender
                         ctx.writeAndFlush(new DatagramPacket(Unpooled.wrappedBuffer(net), packet.sender(), packet.recipient()));
                     } else if (wStatus == SSLEngineResult.Status.CLOSED) {
-                        handshakeFuture.setFailure(new Exception(wStatus.name()));
+                        handshakePromise.setFailure(new Exception(wStatus.name()));
                         ctx.fireExceptionCaught(new Exception(wStatus.name()));
                         ctx.close();
                         return;
                     } else {
-                        handshakeFuture.setFailure(new Exception(wStatus.name()));
+                        handshakePromise.setFailure(new Exception(wStatus.name()));
                         ctx.fireExceptionCaught(new Exception(wStatus.name()));
                         return; // Wait for more data
                     }
@@ -137,7 +153,7 @@ public class DtlsHandler extends ChannelDuplexHandler {
                     break;
                 case FINISHED:
                 case NOT_HANDSHAKING:
-                    handshakeFuture.setSuccess();
+                    handshakePromise.setSuccess(context.channel());
                     handshakeComplete = true;
                     break;
             }
@@ -158,6 +174,35 @@ public class DtlsHandler extends ChannelDuplexHandler {
             } else {
                 promise.setFailure(new Exception(status.name()));
             }
+        }
+    }
+
+    public Future<Channel> handshakeFuture() {
+        return handshakePromise;
+    }
+
+    private final class LazyChannelPromise extends DefaultPromise<Channel> {
+
+        @Override
+        protected EventExecutor executor() {
+            if (context == null) {
+                throw new IllegalStateException();
+            }
+            return context.executor();
+        }
+
+        @Override
+        protected void checkDeadLock() {
+            if (context == null) {
+                // If ctx is null the handlerAdded(...) callback was not called, in this case the checkDeadLock()
+                // method was called from another Thread then the one that is used by ctx.executor(). We need to
+                // guard against this as a user can see a race if handshakeFuture().sync() is called but the
+                // handlerAdded(..) method was not yet as it is called from the EventExecutor of the
+                // ChannelHandlerContext. If we not guard against this super.checkDeadLock() would cause an
+                // IllegalStateException when trying to call executor().
+                return;
+            }
+            super.checkDeadLock();
         }
     }
 
