@@ -128,7 +128,7 @@ public class DtlsHandler extends ChannelDuplexHandler {
                     ByteBuffer net = ByteBuffer.allocate(bus.utils.HI.length + bus.utils.DTLS_ENCRYPTION_OVERHEAD);
                     SSLEngineResult wrap = sslEngine.wrap(ByteBuffer.wrap(bus.utils.HI), net);
                     SSLEngineResult.Status wStatus = wrap.getStatus();
-                    if (wStatus != SSLEngineResult.Status.OK) {
+                    if (wStatus == SSLEngineResult.Status.OK) {
                         hsStatus = wrap.getHandshakeStatus();
                         net.flip();
                         // packet.sender become the recipient, packet.recipient become the sender
