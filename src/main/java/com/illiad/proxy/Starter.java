@@ -26,7 +26,6 @@ public class Starter {
         try {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup).channel(NioServerSocketChannel.class)
-                    .handler(new LoggingHandler(LogLevel.INFO))
                     .childHandler(new ChannelInitializer<NioSocketChannel>() {
                         @Override
                         protected void initChannel(NioSocketChannel ch) {
