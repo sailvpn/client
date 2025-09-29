@@ -35,8 +35,7 @@ public class DtlsHandler extends ChannelDuplexHandler {
     private volatile ChannelHandlerContext context;
     private boolean handshakeComplete = false;
 
-
-    public DtlsHandler(ParamBus bus, InetSocketAddress remoteAddress, ChannelPromise handshakeFuture) {
+    public DtlsHandler(ParamBus bus, InetSocketAddress remoteAddress) {
         this.bus = bus;
         this.sslEngine = bus.dtls.sslCtx.createSSLEngine(remoteAddress.getHostString(), remoteAddress.getPort());
         this.sslEngine.setUseClientMode(true);
