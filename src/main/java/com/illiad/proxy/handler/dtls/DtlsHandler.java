@@ -1,7 +1,6 @@
 package com.illiad.proxy.handler.dtls;
 
 // DtlsHandler.java
-
 import com.illiad.proxy.ParamBus;
 import io.netty.channel.*;
 import io.netty.channel.socket.DatagramPacket;
@@ -14,7 +13,6 @@ import io.netty.util.concurrent.Promise;
 import javax.net.ssl.*;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.util.concurrent.ExecutionException;
 
 import static javax.net.ssl.SSLEngineResult.HandshakeStatus.*;
 
@@ -230,8 +228,8 @@ public class DtlsHandler extends ChannelDuplexHandler {
 
     /**
      * send netout blockingly, netout MUST be flipped before calling this function
-     * @param recipient
-     * @param sender
+     * @param recipient, the remote peer address
+     * @param sender, the local address
      */
     private void doSendBlocking(InetSocketAddress recipient, InetSocketAddress sender) {
 
