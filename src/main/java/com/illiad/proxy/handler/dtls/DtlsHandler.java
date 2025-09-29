@@ -99,9 +99,11 @@ public class DtlsHandler extends ChannelDuplexHandler {
     private void processData(DatagramPacket packet) throws Exception {
 
         // append packet content and release
-        netin.compact()
-                .put(packet.content().nioBuffer())
-                .flip();
+        if (netin.position() != 0) {
+            netin.compact();
+        }
+        netin.put(packet.content().nioBuffer()).flip();
+
         InetSocketAddress recipient = packet.recipient();
         InetSocketAddress sender = packet.sender();
         packet.release();
@@ -122,9 +124,11 @@ public class DtlsHandler extends ChannelDuplexHandler {
     private void doHandshake(DatagramPacket packet) throws Exception {
 
         // append packet content and release
-        netin.compact()
-                .put(packet.content().nioBuffer())
-                .flip();
+        if (netin.position() != 0) {
+            netin.compact();
+        }
+        netin.put(packet.content().nioBuffer()).flip();
+
         InetSocketAddress recipient = packet.recipient();
         InetSocketAddress sender = packet.sender();
         packet.release();
@@ -246,8 +250,9 @@ public class DtlsHandler extends ChannelDuplexHandler {
                     // Block until the operation completes
                     future.sync();
                     // Recursively call for remaining fragments if needed
+                    netout.compact();
                     if (netout.hasRemaining()) {
-                        netout.compact().flip();
+                        netout.flip();
                         doSendBlocking(recipient, sender);
                     }
                 } catch (InterruptedException e) {
