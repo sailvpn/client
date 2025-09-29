@@ -5,7 +5,6 @@ package com.illiad.proxy.handler.dtls;
 import com.illiad.proxy.ParamBus;
 import io.netty.channel.*;
 import io.netty.channel.socket.DatagramPacket;
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.concurrent.DefaultPromise;
 import io.netty.util.concurrent.EventExecutor;
@@ -15,57 +14,76 @@ import io.netty.util.concurrent.Promise;
 import javax.net.ssl.*;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutionException;
+
+import static javax.net.ssl.SSLEngineResult.HandshakeStatus.*;
 
 /**
  * A Netty handler that manages DTLS communication over UDP using SSLEngine.
  * It handles the DTLS handshake and encrypts/decrypts data packets.
  */
 public class DtlsHandler extends ChannelDuplexHandler {
+
     private final ParamBus bus;
-    private volatile ChannelHandlerContext context;
-    private Promise<Channel> handshakePromise = new LazyChannelPromise();
     private final SSLEngine sslEngine;
+    private final ByteBuffer netin;
+    private final ByteBuffer appin;
+    private final ByteBuffer netout;
+    private final ByteBuffer appout;
+    private final ByteBuffer emptyBuffer;
+    private final byte[] fragment;
+
+    private final Promise<Channel> handshakePromise = new LazyChannelPromise();
+    private volatile ChannelHandlerContext context;
     private boolean handshakeComplete = false;
+
 
     public DtlsHandler(ParamBus bus, InetSocketAddress remoteAddress, ChannelPromise handshakeFuture) {
         this.bus = bus;
         this.sslEngine = bus.dtls.sslCtx.createSSLEngine(remoteAddress.getHostString(), remoteAddress.getPort());
         this.sslEngine.setUseClientMode(true);
+        this.netin = ByteBuffer.allocate(bus.utils.NET_IN_SIZE);
+        this.appin = ByteBuffer.allocate(bus.utils.APP_IN_SIZE);
+        this.netout = ByteBuffer.allocate(bus.utils.NET_OUT_SIZE);
+        this.appout = ByteBuffer.allocate(bus.utils.APP_OUT_SIZE);
+        this.emptyBuffer = ByteBuffer.allocate(0);
+        this.fragment = new byte[bus.utils.FRAGMENT_SIZE];
     }
 
     @Override
-    public void handlerAdded(final ChannelHandlerContext ctx) throws Exception {
+    public void handlerAdded(final ChannelHandlerContext ctx) {
         this.context = ctx;
-        if (!handshakePromise.isDone()) {
-            handshakePromise.setSuccess(ctx.channel());
-        }
     }
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         // Start DTLS handshake
         sslEngine.beginHandshake();
-        sendHandshake(ctx);
+        sendHandshake();
     }
 
-    private void sendHandshake(ChannelHandlerContext ctx) throws Exception {
+    private void sendHandshake() throws Exception {
+
         // app is empty for initial handshake
-        ByteBuffer app = ByteBuffer.allocate(0);
-        ByteBuffer net = ByteBuffer.allocate(bus.utils.DTLS_ENCRYPTION_OVERHEAD);
-        SSLEngineResult.Status status = sslEngine.wrap(app, net).getStatus();
+        SSLEngineResult.Status status = sslEngine.wrap(emptyBuffer, netout).getStatus();
         if (status == SSLEngineResult.Status.OK) {
-            net.flip();
-            if (net.hasRemaining()) {
-                ByteBuf buf = Unpooled.wrappedBuffer(net);
-                ctx.writeAndFlush(new DatagramPacket(buf, ((InetSocketAddress) ctx.channel().remoteAddress())));
+            netout.flip();
+            if (netout.hasRemaining()) {
+                // the initial packet is ~250 bytes, should fit into a single small UDP packet
+                context.writeAndFlush(new DatagramPacket(Unpooled.wrappedBuffer(netout), ((InetSocketAddress) context.channel().remoteAddress())))
+                        .addListener(future -> {
+                            //reset the netout buffer for next wrap
+                            netout.clear();
+                            if (!future.isSuccess()) {
+                                handshakePromise.setFailure(new Exception(future.cause()));
+                                context.fireExceptionCaught(new Exception(future.cause()));
+                                context.close();
+                            }
+                        });
             }
-        }
-        if (status == SSLEngineResult.Status.CLOSED) {
-            ctx.fireExceptionCaught(new Exception(status.name()));
-            ctx.close();
         } else {
-            ctx.fireExceptionCaught(new Exception(status.name()));
-            // Wait for more data
+            // least likely that it is other status, because handshake not even started
+            context.close();
         }
     }
 
@@ -74,108 +92,176 @@ public class DtlsHandler extends ChannelDuplexHandler {
 
         if (ctx != null && msg instanceof DatagramPacket packet) {
             if (handshakeComplete) {
-                processData(ctx, packet);
+                processData(packet);
             } else {
-                doHandshake(ctx, packet);
+                doHandshake(packet);
             }
         }
     }
 
-    private void processData(ChannelHandlerContext ctx, DatagramPacket packet) throws Exception {
-        ByteBuf buf = packet.content();
-        // decrypted data can not be larger than paylod
-        ByteBuffer app = ByteBuffer.allocate(buf.readableBytes());
-        SSLEngineResult.Status status = sslEngine.unwrap(buf.nioBuffer(), app).getStatus();
+    private void processData(DatagramPacket packet) throws Exception {
+
+        // append packet content and release
+        netin.compact()
+                .put(packet.content().nioBuffer())
+                .flip();
+        InetSocketAddress recipient = packet.recipient();
+        InetSocketAddress sender = packet.sender();
+        packet.release();
+        SSLEngineResult.Status status = sslEngine.unwrap(netin, appin).getStatus();
         if (status == SSLEngineResult.Status.OK) {
-            app.flip();
-            ByteBuf plainBuf = Unpooled.wrappedBuffer(app);
+            // unwarp successful, appin will be reset by subsequent handlers;
+            appin.flip();
             // Process decrypted data in appIn
-            ctx.fireChannelRead(new DatagramPacket(plainBuf, packet.recipient(), packet.sender()));
+            context.fireChannelRead(new DatagramPacket(Unpooled.wrappedBuffer(appin), recipient, sender));
         } else if (status == SSLEngineResult.Status.CLOSED) {
-            ctx.fireExceptionCaught(new Exception(status.name()));
-            ctx.close();
-        } else {
-            ctx.fireExceptionCaught(new Exception(status.name()));
-            // Wait for more data
+            context.fireExceptionCaught(new Exception(status.name()));
+            context.close();
         }
+        // status == SSLEngineResult.Status.BUFFER_UNDERFLOW, do nothing
+        // status == SSLEngineResult.Status.BUFFER_OVERFLOW, not possible
     }
 
-    private void doHandshake(ChannelHandlerContext ctx, DatagramPacket packet) throws Exception {
+    private void doHandshake(DatagramPacket packet) throws Exception {
+
+        // append packet content and release
+        netin.compact()
+                .put(packet.content().nioBuffer())
+                .flip();
+        InetSocketAddress recipient = packet.recipient();
+        InetSocketAddress sender = packet.sender();
+        packet.release();
 
         SSLEngineResult.HandshakeStatus hsStatus = sslEngine.getHandshakeStatus();
         while (!handshakeComplete) {
-            switch (hsStatus) {
-                case NEED_UNWRAP:
-                case NEED_UNWRAP_AGAIN:
-                    ByteBuf buf = packet.content();
-                    // no need to keep decrypted data,  can not be larger than paylod
-                    SSLEngineResult unwrap = sslEngine.unwrap(buf.nioBuffer(), ByteBuffer.allocate(buf.readableBytes()));
-                    SSLEngineResult.Status nwStatus = unwrap.getStatus();
-                    if (nwStatus == SSLEngineResult.Status.OK) {
-                        hsStatus = unwrap.getHandshakeStatus();
-                    } else if (nwStatus == SSLEngineResult.Status.CLOSED) {
-                        handshakePromise.setFailure(new Exception(nwStatus.name()));
-                        ctx.fireExceptionCaught(new Exception(nwStatus.name()));
-                        ctx.close();
-                        return;
-                    } else {
-                        handshakePromise.setFailure(new Exception(nwStatus.name()));
-                        ctx.fireExceptionCaught(new Exception(nwStatus.name()));
-                        return; // Wait for more data
-                    }
+            // use "if" rather than "switch" in order to avoid ambiguous between "break switch" and "break while"
+            if (hsStatus == NEED_UNWRAP) {
+                SSLEngineResult unwrap = sslEngine.unwrap(netin, appin);
+                SSLEngineResult.Status uStatus = unwrap.getStatus();
+                if (uStatus == SSLEngineResult.Status.OK) {
+                    // unwarp successful, clear appin
+                    appin.clear();
+                    hsStatus = unwrap.getHandshakeStatus();
+                } else if (uStatus == SSLEngineResult.Status.BUFFER_UNDERFLOW) {
+                    // wait for more date
                     break;
-                case NEED_WRAP:
-                    ByteBuffer net = ByteBuffer.allocate(bus.utils.HI.length + bus.utils.DTLS_ENCRYPTION_OVERHEAD);
-                    SSLEngineResult wrap = sslEngine.wrap(ByteBuffer.wrap(bus.utils.HI), net);
-                    SSLEngineResult.Status wStatus = wrap.getStatus();
-                    if (wStatus == SSLEngineResult.Status.OK) {
-                        hsStatus = wrap.getHandshakeStatus();
-                        net.flip();
-                        // packet.sender become the recipient, packet.recipient become the sender
-                        ctx.writeAndFlush(new DatagramPacket(Unpooled.wrappedBuffer(net), packet.sender(), packet.recipient()));
-                    } else if (wStatus == SSLEngineResult.Status.CLOSED) {
-                        handshakePromise.setFailure(new Exception(wStatus.name()));
-                        ctx.fireExceptionCaught(new Exception(wStatus.name()));
-                        ctx.close();
-                        return;
-                    } else {
-                        handshakePromise.setFailure(new Exception(wStatus.name()));
-                        ctx.fireExceptionCaught(new Exception(wStatus.name()));
-                        return; // Wait for more data
-                    }
+                } else if (uStatus == SSLEngineResult.Status.CLOSED) {
+                    handshakePromise.setFailure(new Exception(uStatus.name()));
+                    context.fireExceptionCaught(new Exception(uStatus.name()));
+                    context.close();
+                    return;
+                }
+                // uStatus == SSLEngineResult.Status.BUFFER_OVERFLOW, not possible, appin had been set with maximum size
+            } else if (hsStatus == NEED_UNWRAP_AGAIN) {
+                // empty buffer applied because SSLEngine is using internally cached data from previous NEED_UNWRAP
+                SSLEngineResult unwrap = sslEngine.unwrap(emptyBuffer, appin);
+                SSLEngineResult.Status uStatus = unwrap.getStatus();
+                if (uStatus == SSLEngineResult.Status.OK) {
+                    // unwarp successful
+                    appin.clear();
+                    hsStatus = unwrap.getHandshakeStatus();
+                } else if (uStatus == SSLEngineResult.Status.BUFFER_UNDERFLOW) {
+                    // wait for more date
                     break;
-                case NEED_TASK:
-                    Runnable task;
-                    while ((task = sslEngine.getDelegatedTask()) != null) {
-                        task.run();
-                    }
-                    hsStatus = sslEngine.getHandshakeStatus();
-                    break;
-                case FINISHED:
-                case NOT_HANDSHAKING:
-                    handshakePromise.setSuccess(context.channel());
-                    handshakeComplete = true;
-                    break;
+                } else if (uStatus == SSLEngineResult.Status.CLOSED) {
+                    handshakePromise.setFailure(new Exception(uStatus.name()));
+                    context.fireExceptionCaught(new Exception(uStatus.name()));
+                    context.close();
+                    return;
+                }
+                // BUFFER_OVERFLOW is not possible, appin had been set with maximum size
+
+            } else if (hsStatus == NEED_WRAP) {
+                // empty buffer applied because SSLEngine is using internal data
+                SSLEngineResult wrap = sslEngine.wrap(emptyBuffer, netout);
+                SSLEngineResult.Status wStatus = wrap.getStatus();
+                if (wStatus == SSLEngineResult.Status.OK) {
+                    netout.flip();
+                    doSendBlocking(recipient, sender);
+                    hsStatus = wrap.getHandshakeStatus();
+                } else if (wStatus == SSLEngineResult.Status.CLOSED) {
+                    handshakePromise.setFailure(new Exception(wStatus.name()));
+                    context.fireExceptionCaught(new Exception(wStatus.name()));
+                    context.close();
+                    return;
+                }
+                // BUFFER_UNDERFLOW is not possible, SSLEngine is using internal data
+                // BUFFER_OVERFLOW is not possible, netout had been set with maximum size
+
+            } else if (hsStatus == NEED_TASK) {
+                Runnable task;
+                while ((task = sslEngine.getDelegatedTask()) != null) {
+                    task.run();
+                }
+                hsStatus = sslEngine.getHandshakeStatus();
+
+            } else if (hsStatus == FINISHED || hsStatus == NOT_HANDSHAKING) {
+
+                // clear all buffers for data transmission
+                netin.clear();
+                netout.clear();
+                appin.clear();
+                appout.clear();
+                handshakeComplete = true;
+                handshakePromise.setSuccess(context.channel());
             }
 
         }
     }
+
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-        if (ctx != null && msg instanceof DatagramPacket packet) {
-            // 128 bytes for encryption overhead
-            ByteBuffer net = ByteBuffer.allocate(packet.content().readableBytes() + bus.utils.DTLS_ENCRYPTION_OVERHEAD);
-            SSLEngineResult.Status status = sslEngine.wrap(packet.content().nioBuffer(), net).getStatus();
+        if (handshakeComplete && sslEngine.getHandshakeStatus() == SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING && msg instanceof DatagramPacket packet) {
+            SSLEngineResult.Status status = sslEngine.wrap(packet.content().nioBuffer(), netout).getStatus();
             if (status == SSLEngineResult.Status.OK) {
-                net.flip();
-                ctx.writeAndFlush(new DatagramPacket(Unpooled.wrappedBuffer(net), packet.recipient(), packet.sender()));
+                InetSocketAddress recpient = packet.recipient();
+                InetSocketAddress sender = packet.sender();
+                packet.content().release();
+                netout.flip();
+                doSendBlocking(recpient, sender);
                 promise.setSuccess();
             } else {
-                promise.setFailure(new Exception(status.name()));
+                promise.setFailure(new Exception(status.name() + System.lineSeparator() + sslEngine.getHandshakeStatus()));
+            }
+
+        }
+    }
+
+    /**
+     * send netout blockingly, netout MUST be flipped before calling this function
+     * @param recipient
+     * @param sender
+     */
+    private void doSendBlocking(InetSocketAddress recipient, InetSocketAddress sender) {
+
+        if (netout.hasRemaining()) {
+            ChannelFuture future;
+            if (netout.remaining() < bus.utils.FRAGMENT_SIZE) {
+                future = context.writeAndFlush(new DatagramPacket(Unpooled.wrappedBuffer(netout), recipient, sender));
+            } else {
+                netout.get(fragment);
+                future = context.writeAndFlush(new DatagramPacket(Unpooled.wrappedBuffer(fragment), recipient, sender));
+            }
+
+            if (future != null) {
+                try {
+                    // Block until the operation completes
+                    future.sync();
+                    // Recursively call for remaining fragments if needed
+                    if (netout.hasRemaining()) {
+                        netout.compact().flip();
+                        doSendBlocking(recipient, sender);
+                    }
+                } catch (InterruptedException e) {
+                    // The future failed, handle the exception
+                    context.fireExceptionCaught(e);
+                    context.close();
+                }
             }
         }
     }
+
 
     public Future<Channel> handshakeFuture() {
         return handshakePromise;
