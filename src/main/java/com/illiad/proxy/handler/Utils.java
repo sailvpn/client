@@ -16,11 +16,12 @@ public class Utils {
     public final String IPV4_ZERO_Addr = "0.0.0.0";
     public final int IPV4_ZERO_PORT = 0;
     public final String associateFailed = "Creating binding failed";
-    public final int NET_OUT_SIZE = 655360; // 10 time Maximum UDP(65536)
-    public final int APP_OUT_SIZE = 655360; // 10 time Maximum UDP(65536), maximum handshake message size is 16k
-    public final int NET_IN_SIZE = 655360; // 10 time Maximum UDP(65536), even though typical MTU is 1500, but larger packet is expected due to fragmentation
-    public final int APP_IN_SIZE = 655360; // 10 time Maximum UDP(65536)
-    public final int FRAGMENT_SIZE = 1300; // maximum datgram size
+    // set buffer size to 1310720 (65536*20) to ensure that buffer limit can never be equal to buffer capacity in read mode
+    // this is how we decide if a buffer is in read mode (limit < capacity), or in write mode (limit == capacity)
+    public final int NET_OUT_SIZE = 1310720;
+    public final int NET_IN_SIZE = 1310720;
+    public final int APP_IN_SIZE = 1310720;
+    public final int FRAGMENT_SIZE = 1300;
 
     /**
      * Closes the specified channel after all queued write requests are flushed.
