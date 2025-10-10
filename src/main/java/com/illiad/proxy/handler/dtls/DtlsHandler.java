@@ -45,13 +45,14 @@ public class DtlsHandler extends ChannelDuplexHandler {
         this.fragment = new byte[bus.utils.FRAGMENT_SIZE];
     }
 
+    /**
+     * DtlsHandler is added AFTER channel was active, (see FwdAsoAckHandler),
+     * channelActive() is never triggered
+     * @param ctx ChannelHandlerContext
+     */
     @Override
     public void handlerAdded(final ChannelHandlerContext ctx) {
         this.context = ctx;
-    }
-
-    @Override
-    public void channelActive(ChannelHandlerContext ctx) {
 
         try {
             // Start DTLS handshake
@@ -60,6 +61,7 @@ public class DtlsHandler extends ChannelDuplexHandler {
         } catch (SSLException e) {
             context.fireExceptionCaught(e);
         }
+
     }
 
     private void sendHandshake() {
