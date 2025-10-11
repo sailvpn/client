@@ -1,5 +1,6 @@
 package com.illiad.proxy.handler.v5;
 import com.illiad.proxy.ParamBus;
+import com.illiad.proxy.handler.dtls.DtlsHandler;
 import com.illiad.proxy.handler.udp.Aso;
 import com.illiad.proxy.handler.udp.ResHandler;
 import io.netty.bootstrap.Bootstrap;
@@ -9,6 +10,8 @@ import io.netty.channel.socket.DatagramPacket;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.handler.codec.socksx.v5.Socks5CommandResponse;
 import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
 import io.netty.util.ReferenceCountUtil;
 
 import java.net.InetSocketAddress;
@@ -52,7 +55,6 @@ public class FwdAsoAckHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         .handler(new ChannelInitializer<DatagramChannel>() {
                             @Override
                             protected void initChannel(DatagramChannel ch) {
-                                ch.pipeline().addLast(new ResHandler(bus));
                             }
                         })
                         .connect(res.bndAddr(), res.bndPort())
@@ -61,17 +63,34 @@ public class FwdAsoAckHandler extends SimpleChannelInboundHandler<Socks5CommandR
                             if (future.isSuccess()) {
                                 // The connection was successful, and the channel is now active.
                                 Channel fwdUdpChannel = future.channel();
-                                //associate forward Udp Channel
-                                aso.getForwards().add(fwdUdpChannel);
-                                // new Udp Packet with forward remote address (2nd leg's bind) as recepient, 1st leg's bind as sender
-                                DatagramPacket fwdUdpPacket = new DatagramPacket(packet.content(), (InetSocketAddress) fwdUdpChannel.remoteAddress(), (InetSocketAddress) aso.getBind().localAddress());
-                                fwdUdpChannel.writeAndFlush(fwdUdpPacket)
-                                        .addListener(future1 -> {
-                                            if (!future1.isSuccess()) {
-                                                ctx.fireExceptionCaught(future1.cause());
-                                                bus.utils.closeOnFlush(fwdUdpChannel);
-                                            }
-                                        });
+                                DtlsHandler dtlsHandler = new DtlsHandler(bus, (InetSocketAddress) fwdUdpChannel.remoteAddress());
+
+                                fwdUdpChannel.pipeline().addLast(new LoggingHandler(LogLevel.INFO))
+                                        .addLast(dtlsHandler);
+                                dtlsHandler.handshakeFuture().addListener(future1 -> {
+                                    if (future1.isSuccess()) {
+                                        // Successfully completed DTLS handshake
+                                        fwdUdpChannel.pipeline()
+                                                .addLast(new ResHandler(bus));
+                                        //associate forward Udp Channel
+                                        aso.getForwards().add(fwdUdpChannel);
+
+                                        // new Udp Packet with forward remote address (2nd leg's bind) as recepient, 1st leg's bind as sender
+                                        DatagramPacket fwdUdpPacket = new DatagramPacket(packet.content(), (InetSocketAddress) fwdUdpChannel.remoteAddress(), (InetSocketAddress) aso.getBind().localAddress());
+                                        fwdUdpChannel.writeAndFlush(fwdUdpPacket)
+                                                .addListener(future2 -> {
+                                                    if (!future2.isSuccess()) {
+                                                        ctx.fireExceptionCaught(future2.cause());
+                                                        bus.utils.closeOnFlush(fwdUdpChannel);
+                                                    }
+                                                });
+
+                                    } else {
+                                        ReferenceCountUtil.release(packet);
+                                        ctx.fireExceptionCaught(future1.cause());
+                                        bus.utils.closeOnFlush(fwdUdpChannel);
+                                    }
+                                });
 
                             } else {
                                 ReferenceCountUtil.release(packet);
