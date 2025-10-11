@@ -93,7 +93,8 @@ public class DtlsHandler extends ChannelDuplexHandler {
             if (sslEngine.getHandshakeStatus() == NOT_HANDSHAKING) {
                 decrypt(recipient, sender);
             } else {
-                doHandshake(recipient, sender);
+                // handshake session loops back at SSLEngine, switch sender, recipient
+                doHandshake(sender, recipient);
             }
         }
     }
