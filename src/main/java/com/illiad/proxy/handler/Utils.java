@@ -88,7 +88,6 @@ public class Utils {
             byte[] domainBytes = address.getAddress();
             buf.writeByte(domainBytes.length); // Length of domain name
             buf.writeBytes(domainBytes); // Domain name bytes
-            throw new UnsupportedOperationException("Domain name addressing not fully implemented in this example.");
         }
 
         // 4. DST.PORT (Destination Port) - 2 bytes
