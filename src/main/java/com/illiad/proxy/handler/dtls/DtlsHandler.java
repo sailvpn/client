@@ -33,6 +33,8 @@ public class DtlsHandler extends ChannelDuplexHandler {
 
     private final Promise<Channel> handshakePromise = new LazyChannelPromise();
     private volatile ChannelHandlerContext context;
+    private final Object inboundLock = new Object();
+    private final Object outboundLock = new Object();
 
     public DtlsHandler(ParamBus bus, InetSocketAddress remoteAddress) {
         this.bus = bus;
@@ -66,16 +68,18 @@ public class DtlsHandler extends ChannelDuplexHandler {
 
     private void sendHandshake() {
 
-        try {
-            // empty buffer for initial handshake
-            SSLEngineResult.Status status = sslEngine.wrap(emptyBuffer, netout).getStatus();
-            if (status == SSLEngineResult.Status.OK) {
-                doSend((InetSocketAddress) context.channel().remoteAddress(), (InetSocketAddress) context.channel().localAddress());
-            }
-            // least likely for other status, because handshake not even started
+        synchronized (outboundLock) {
+            try {
+                // empty buffer for initial handshake
+                SSLEngineResult.Status status = sslEngine.wrap(emptyBuffer, netout).getStatus();
+                if (status == SSLEngineResult.Status.OK) {
+                    doSend((InetSocketAddress) context.channel().remoteAddress(), (InetSocketAddress) context.channel().localAddress());
+                }
+                // least likely for other status, because handshake not even started
 
-        } catch (SSLException e) {
-            context.fireExceptionCaught(e);
+            } catch (SSLException e) {
+                context.fireExceptionCaught(e);
+            }
         }
     }
 
@@ -84,11 +88,10 @@ public class DtlsHandler extends ChannelDuplexHandler {
 
         if (msg instanceof DatagramPacket packet) {
 
-            //append network data to netin, and release packet
+            //append network data to netin
             append(packet);
             InetSocketAddress recipient = packet.recipient();
             InetSocketAddress sender = packet.sender();
-            packet.release();
 
             if (sslEngine.getHandshakeStatus() == NOT_HANDSHAKING) {
                 decrypt(recipient, sender);
@@ -99,34 +102,43 @@ public class DtlsHandler extends ChannelDuplexHandler {
         }
     }
 
+    /**
+     * append network data to netin, and release packet content
+     * @param packet DatagramPacket
+     */
     private void append(DatagramPacket packet) {
-        // compact netin if it is in read mode
-        if (netin.limit() < netin.capacity()) {
-            netin.compact();
+        synchronized (inboundLock) {
+            // compact netin if it is in read mode
+            if (netin.limit() < netin.capacity()) {
+                netin.compact();
+            }
+            netin.put(packet.content().nioBuffer());
+            packet.content().release();
         }
-        netin.put(packet.content().nioBuffer());
     }
 
     private void decrypt(InetSocketAddress recipient, InetSocketAddress sender) {
 
-        // flip netin if it's in write mode
-        if (netin.limit() == netin.capacity()) {
-            netin.flip();
-        }
-
-        try {
-            SSLEngineResult.Status status = sslEngine.unwrap(netin, appin).getStatus();
-            if (status == SSLEngineResult.Status.OK) {
-                // unwarp successful, flip and forward appin;
-                appin.flip();
-                context.fireChannelRead(new DatagramPacket(Unpooled.wrappedBuffer(appin), recipient, sender));
-            } else if (status == SSLEngineResult.Status.CLOSED) {
-                context.fireExceptionCaught(new Exception(status.name()));
+        synchronized (inboundLock) {
+            // flip netin if it's in write mode
+            if (netin.limit() == netin.capacity()) {
+                netin.flip();
             }
-            // status == SSLEngineResult.Status.BUFFER_UNDERFLOW, not possible
-            // status == SSLEngineResult.Status.BUFFER_OVERFLOW, not possible
-        } catch (SSLException e) {
-            context.fireExceptionCaught(e);
+
+            try {
+                SSLEngineResult.Status status = sslEngine.unwrap(netin, appin).getStatus();
+                if (status == SSLEngineResult.Status.OK) {
+                    // unwarp successful, flip and forward appin;
+                    appin.flip();
+                    context.fireChannelRead(new DatagramPacket(Unpooled.wrappedBuffer(appin), recipient, sender));
+                } else if (status == SSLEngineResult.Status.CLOSED) {
+                    context.fireExceptionCaught(new Exception(status.name()));
+                }
+                // status == SSLEngineResult.Status.BUFFER_UNDERFLOW, not possible
+                // status == SSLEngineResult.Status.BUFFER_OVERFLOW, not possible
+            } catch (SSLException e) {
+                context.fireExceptionCaught(e);
+            }
         }
     }
 
@@ -147,55 +159,59 @@ public class DtlsHandler extends ChannelDuplexHandler {
             while (hsStatus != NOT_HANDSHAKING) {
                 // use "if" rather than "switch" in order to avoid ambiguous between "break switch" and "break while"
                 if (hsStatus == NEED_UNWRAP) {
-                    // flip netin if it's in write mode
-                    if (netin.limit() == netin.capacity()) {
-                        netin.flip();
-                    }
-                    SSLEngineResult.Status uStatus = sslEngine.unwrap(netin, appin).getStatus();
-                    if (uStatus == SSLEngineResult.Status.BUFFER_UNDERFLOW) {
-                        // wait for more data from net peer
-                        break;
-                    } else if (uStatus == SSLEngineResult.Status.CLOSED) {
-                        handshakePromise.setFailure(new Exception(uStatus.name()));
-                        context.fireExceptionCaught(new Exception(uStatus.name()));
-                        return;
-                    }
-                    // uStatus == SSLEngineResult.Status.OK, do nothing
-                    // uStatus == SSLEngineResult.Status.BUFFER_OVERFLOW, not possible, appin had been set with maximum size
-                } else if (hsStatus == NEED_UNWRAP_AGAIN) {
-                    // empty buffer applied because SSLEngine is using internally cached data from previous NEED_UNWRAP
-                    SSLEngineResult.Status uStatus = sslEngine.unwrap(emptyBuffer, appin).getStatus();
-                    if (uStatus == SSLEngineResult.Status.BUFFER_UNDERFLOW) {
+                    synchronized (inboundLock) {
                         // flip netin if it's in write mode
                         if (netin.limit() == netin.capacity()) {
                             netin.flip();
                         }
-                        // netin empty, break to wait for more data frm net peer
-                        if (!netin.hasRemaining()) {
+                        SSLEngineResult.Status uStatus = sslEngine.unwrap(netin, appin).getStatus();
+                        if (uStatus == SSLEngineResult.Status.BUFFER_UNDERFLOW) {
+                            // wait for more data from net peer
                             break;
+                        } else if (uStatus == SSLEngineResult.Status.CLOSED) {
+                            handshakePromise.setFailure(new Exception(uStatus.name()));
+                            context.fireExceptionCaught(new Exception(uStatus.name()));
+                            return;
                         }
-                        // data available in netin, proceed wtih local handshake
-                    } else if (uStatus == SSLEngineResult.Status.CLOSED) {
-                        handshakePromise.setFailure(new Exception(uStatus.name()));
-                        context.fireExceptionCaught(new Exception(uStatus.name()));
-                        return;
+                        // uStatus == SSLEngineResult.Status.OK, do nothing
+                        // uStatus == SSLEngineResult.Status.BUFFER_OVERFLOW, not possible, appin had been set with maximum size
                     }
-                    // uStatus == SSLEngineResult.Status.OK, do nothing
-                    // BUFFER_OVERFLOW is not possible, appin had been set with maximum size
-
+                } else if (hsStatus == NEED_UNWRAP_AGAIN) {
+                    synchronized (inboundLock) {
+                        // empty buffer applied because SSLEngine is using internally cached data from previous NEED_UNWRAP
+                        SSLEngineResult.Status uStatus = sslEngine.unwrap(emptyBuffer, appin).getStatus();
+                        if (uStatus == SSLEngineResult.Status.BUFFER_UNDERFLOW) {
+                            // flip netin if it's in write mode
+                            if (netin.limit() == netin.capacity()) {
+                                netin.flip();
+                            }
+                            // netin empty, break to wait for more data frm net peer
+                            if (!netin.hasRemaining()) {
+                                break;
+                            }
+                            // data available in netin, proceed wtih local handshake
+                        } else if (uStatus == SSLEngineResult.Status.CLOSED) {
+                            handshakePromise.setFailure(new Exception(uStatus.name()));
+                            context.fireExceptionCaught(new Exception(uStatus.name()));
+                            return;
+                        }
+                        // uStatus == SSLEngineResult.Status.OK, do nothing
+                        // BUFFER_OVERFLOW is not possible, appin had been set with maximum size
+                    }
                 } else if (hsStatus == NEED_WRAP) {
-                    // empty buffer applied because SSLEngine is using internal data
-                    SSLEngineResult.Status wStatus = sslEngine.wrap(emptyBuffer, netout).getStatus();
-                    if (wStatus == SSLEngineResult.Status.OK) {
-                        doSend(recipient, sender);
-                    } else if (wStatus == SSLEngineResult.Status.CLOSED) {
-                        handshakePromise.setFailure(new Exception(wStatus.name()));
-                        context.fireExceptionCaught(new Exception(wStatus.name()));
-                        return;
+                    synchronized (outboundLock) {
+                        // empty buffer applied because SSLEngine is using internal data
+                        SSLEngineResult.Status wStatus = sslEngine.wrap(emptyBuffer, netout).getStatus();
+                        if (wStatus == SSLEngineResult.Status.OK) {
+                            doSend(recipient, sender);
+                        } else if (wStatus == SSLEngineResult.Status.CLOSED) {
+                            handshakePromise.setFailure(new Exception(wStatus.name()));
+                            context.fireExceptionCaught(new Exception(wStatus.name()));
+                            return;
+                        }
+                        // BUFFER_UNDERFLOW is not possible, SSLEngine is using internal data
+                        // BUFFER_OVERFLOW is not possible, netout had been set with maximum size
                     }
-                    // BUFFER_UNDERFLOW is not possible, SSLEngine is using internal data
-                    // BUFFER_OVERFLOW is not possible, netout had been set with maximum size
-
                 } else if (hsStatus == NEED_TASK) {
                     Runnable task;
                     while ((task = sslEngine.getDelegatedTask()) != null) {
@@ -211,9 +227,14 @@ public class DtlsHandler extends ChannelDuplexHandler {
 
             // "while" statement could be broke in the scenario of "BUFFER_UNDERFLOW"
             if (hsStatus == NOT_HANDSHAKING) {
-                // handshake finished, clear appin, buffers for data transmission
-                netin.clear();
-                appin.clear();
+                synchronized (inboundLock) {
+                    // handshake finished, clear netin, appin, buffers for data transmission
+                    netin.clear();
+                    appin.clear();
+                }
+                /**
+                 * netout is always cleared, see doSend()
+                 */
                 handshakePromise.setSuccess(context.channel());
             }
 
@@ -232,23 +253,25 @@ public class DtlsHandler extends ChannelDuplexHandler {
      */
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
-        try {
-            if (sslEngine.getHandshakeStatus() == NOT_HANDSHAKING && msg instanceof DatagramPacket packet) {
-                SSLEngineResult.Status status = sslEngine.wrap(packet.content().nioBuffer(), netout).getStatus();
-                if (status == SSLEngineResult.Status.OK) {
-                    InetSocketAddress recpient = packet.recipient();
-                    InetSocketAddress sender = packet.sender();
+        synchronized (outboundLock) {
+            try {
+                if (sslEngine.getHandshakeStatus() == NOT_HANDSHAKING && msg instanceof DatagramPacket packet) {
+                    SSLEngineResult.Status status = sslEngine.wrap(packet.content().nioBuffer(), netout).getStatus();
                     packet.content().release();
-                    doSend(recpient, sender);
-                    promise.setSuccess();
-                } else {
-                    promise.setFailure(new Exception(status.name() + System.lineSeparator() + sslEngine.getHandshakeStatus()));
-                }
+                    if (status == SSLEngineResult.Status.OK) {
+                        InetSocketAddress recpient = packet.recipient();
+                        InetSocketAddress sender = packet.sender();
+                        doSend(recpient, sender);
+                        promise.setSuccess();
+                    } else {
+                        promise.setFailure(new Exception(status.name() + System.lineSeparator() + sslEngine.getHandshakeStatus()));
+                    }
 
+                }
+            } catch (SSLException e) {
+                promise.setFailure(e);
+                context.fireExceptionCaught(e);
             }
-        } catch (SSLException e) {
-            promise.setFailure(e);
-            context.fireExceptionCaught(e);
         }
     }
 
