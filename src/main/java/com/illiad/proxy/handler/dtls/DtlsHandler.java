@@ -1,6 +1,7 @@
 package com.illiad.proxy.handler.dtls;
 
 // DtlsHandler.java
+
 import com.illiad.proxy.ParamBus;
 import io.netty.channel.*;
 import io.netty.channel.socket.DatagramPacket;
@@ -50,6 +51,7 @@ public class DtlsHandler extends ChannelDuplexHandler {
     /**
      * DtlsHandler is added AFTER channel was active, (see FwdAsoAckHandler),
      * channelActive() is never triggered
+     *
      * @param ctx ChannelHandlerContext
      */
     @Override
@@ -104,6 +106,7 @@ public class DtlsHandler extends ChannelDuplexHandler {
 
     /**
      * append network data to netin, and release packet content
+     *
      * @param packet DatagramPacket
      */
     private void append(DatagramPacket packet) {
@@ -126,16 +129,26 @@ public class DtlsHandler extends ChannelDuplexHandler {
             }
 
             try {
-                SSLEngineResult.Status status = sslEngine.unwrap(netin, appin).getStatus();
-                if (status == SSLEngineResult.Status.OK) {
-                    // unwarp successful, flip and forward appin;
-                    appin.flip();
-                    context.fireChannelRead(new DatagramPacket(Unpooled.wrappedBuffer(appin), recipient, sender));
-                } else if (status == SSLEngineResult.Status.CLOSED) {
-                    context.fireExceptionCaught(new Exception(status.name()));
+                SSLEngineResult result = sslEngine.unwrap(netin, appin);
+                appin.flip();
+                // ignore handshake status here, as handshake is already completed
+                if (result.getHandshakeStatus() == NOT_HANDSHAKING) {
+                    SSLEngineResult.Status status = result.getStatus();
+                    if (status == SSLEngineResult.Status.OK) {
+                        // unwarp successful, flip and forward appin;
+
+                        if (appin.hasRemaining()) {
+                            byte[] appinBytes = new byte[appin.remaining()];
+                            appin.get(appinBytes);
+                            context.fireChannelRead(new DatagramPacket(Unpooled.wrappedBuffer(appinBytes), recipient, sender));
+                        }
+                    } else if (status == SSLEngineResult.Status.CLOSED) {
+                        context.fireExceptionCaught(new Exception(status.name()));
+                    }
+                    // status == SSLEngineResult.Status.BUFFER_UNDERFLOW, not possible
+                    // status == SSLEngineResult.Status.BUFFER_OVERFLOW, not possible
                 }
-                // status == SSLEngineResult.Status.BUFFER_UNDERFLOW, not possible
-                // status == SSLEngineResult.Status.BUFFER_OVERFLOW, not possible
+                appin.clear();
             } catch (SSLException e) {
                 context.fireExceptionCaught(e);
             }
@@ -247,8 +260,8 @@ public class DtlsHandler extends ChannelDuplexHandler {
     /**
      * encrpt message and send
      *
-     * @param ctx ChannelHandlerContext
-     * @param msg DatagramPacket
+     * @param ctx     ChannelHandlerContext
+     * @param msg     DatagramPacket
      * @param promise ChannelPromise
      */
     @Override
@@ -283,7 +296,7 @@ public class DtlsHandler extends ChannelDuplexHandler {
      */
     private void doSend(InetSocketAddress recipient, InetSocketAddress sender) {
         // flip netout if it's in write mode
-        if(netout.limit() == netout.capacity()) {
+        if (netout.limit() == netout.capacity()) {
             netout.flip();
         }
         try {
