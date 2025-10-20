@@ -31,6 +31,7 @@ public class DtlsHandler extends ChannelDuplexHandler {
     private final ByteBuffer netout;
     private final ByteBuffer emptyBuffer;
     private final byte[] fragment;
+    private final byte[] wagon;
 
     private final Promise<Channel> handshakePromise = new LazyChannelPromise();
     private volatile ChannelHandlerContext context;
@@ -46,6 +47,7 @@ public class DtlsHandler extends ChannelDuplexHandler {
         this.netout = ByteBuffer.allocate(bus.utils.NET_OUT_SIZE);
         this.emptyBuffer = ByteBuffer.allocate(0);
         this.fragment = new byte[bus.utils.FRAGMENT_SIZE];
+        this.wagon = new byte[bus.utils.APP_IN_SIZE];
     }
 
     /**
@@ -135,12 +137,11 @@ public class DtlsHandler extends ChannelDuplexHandler {
                 if (result.getHandshakeStatus() == NOT_HANDSHAKING) {
                     SSLEngineResult.Status status = result.getStatus();
                     if (status == SSLEngineResult.Status.OK) {
-                        // unwarp successful, flip and forward appin;
-
+                        // unwarp successful;
                         if (appin.hasRemaining()) {
-                            byte[] appinBytes = new byte[appin.remaining()];
-                            appin.get(appinBytes);
-                            context.fireChannelRead(new DatagramPacket(Unpooled.wrappedBuffer(appinBytes), recipient, sender));
+                            int length = appin.remaining();
+                            appin.get(wagon, 0, length);
+                            context.fireChannelRead(new DatagramPacket(Unpooled.wrappedBuffer(wagon, 0, length), recipient, sender));
                         }
                     } else if (status == SSLEngineResult.Status.CLOSED) {
                         context.fireExceptionCaught(new Exception(status.name()));
