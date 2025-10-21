@@ -2,6 +2,7 @@ package com.illiad.proxy.handler.v5;
 
 import com.illiad.proxy.ParamBus;
 import com.illiad.proxy.codec.v5.V5CmdReqDecoder;
+import com.illiad.proxy.handler.v5.associate.AssociateHandler;
 import io.netty.channel.*;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.socksx.v5.*;
