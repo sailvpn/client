@@ -8,8 +8,6 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.socksx.v5.Socks5CommandResponse;
 import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
 
-import java.util.concurrent.ExecutionException;
-
 public class V5AckHandler extends SimpleChannelInboundHandler<Socks5CommandResponse> {
 
     private final ChannelHandlerContext frontendCtx;
@@ -21,7 +19,7 @@ public class V5AckHandler extends SimpleChannelInboundHandler<Socks5CommandRespo
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, Socks5CommandResponse response) throws ExecutionException, InterruptedException {
+    protected void channelRead0(ChannelHandlerContext ctx, Socks5CommandResponse response) {
 
         if (response.status() == Socks5CommandStatus.SUCCESS) {
             // wite response to frontend
