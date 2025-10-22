@@ -4,6 +4,9 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.socksx.v5.Socks5AddressType;
 import io.netty.util.NetUtil;
 import org.springframework.stereotype.Component;
@@ -94,4 +97,45 @@ public class Utils {
         buf.writeShort(socketAddr.getPort());
 
     }
+
+    /**
+     * parse HttpRequest to extract the underlying port
+     * @param request HttpRequest
+     * @return port
+     */
+    public int getTargetPort(HttpRequest request) {
+        // Handle CONNECT method for HTTPS tunneling
+        if (request.method().equals(HttpMethod.CONNECT)) {
+            String uri = request.uri();
+            String[] parts = uri.split(":");
+            return parts.length > 1 ? Integer.parseInt(parts[1]) : 443;
+        }
+
+        // Handle standard GET/POST/etc. methods
+        String hostHeader = request.headers().get(HttpHeaderNames.HOST);
+        if (hostHeader == null) {
+            // Default to port 80 if no host header is present
+            return 80;
+        }
+
+        // Check for an explicit port in the Host header
+        String[] hostParts = hostHeader.split(":");
+        if (hostParts.length > 1) {
+            try {
+                return Integer.parseInt(hostParts[1]);
+            } catch (NumberFormatException e) {
+                // Malformed host header, fall back to default
+                // Consider logging an error here
+            }
+        }
+
+        // Fallback to default port based on protocol (assuming HTTP)
+        // For a full implementation, you'd check the protocol.
+        // As a blind proxy, we can often assume 80 for regular traffic.
+        // For a more robust proxy, you might need to determine this contextually
+        // or check for an HTTPS connection.
+        return 80; // Default HTTP port
+    }
+
+
 }
