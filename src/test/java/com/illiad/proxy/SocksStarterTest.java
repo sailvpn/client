@@ -17,7 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
-class StarterTest {
+class SocksStarterTest {
 
     @Mock
     private Params params;
