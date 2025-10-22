@@ -13,11 +13,11 @@ import io.netty.handler.logging.LoggingHandler;
 import org.springframework.stereotype.Component;
 
 @Component
-public class Starter {
+public class SocksStarter {
 
     private ParamBus bus;
 
-    public Starter(ParamBus bus) {
+    public SocksStarter(ParamBus bus) {
         this.bus = bus;
 
         // Configure the bootstrap.

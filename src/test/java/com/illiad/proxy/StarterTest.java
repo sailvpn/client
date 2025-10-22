@@ -26,7 +26,7 @@ class StarterTest {
     @Mock
     private V5CommandHandler v5CommandHandler;
     @InjectMocks
-    private Starter starter;
+    private SocksStarter starter;
 
     @BeforeEach
     void setUp() {
