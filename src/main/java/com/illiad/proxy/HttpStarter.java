@@ -30,9 +30,8 @@ public class HttpStarter {
                     .childHandler(new ChannelInitializer<SocketChannel>() {
                         @Override
                         public void initChannel(SocketChannel ch) {
-                            ch.pipeline().addLast(
-                                    new HttpServerCodec(),
-                                    new FrontHandler(bus.params.getRemoteHost(), bus.params.getRemotePort()));
+                            ch.pipeline().addLast(bus.namer.generateName(), new HttpServerCodec())
+                                    .addLast(bus.namer.generateName(), new FrontHandler(bus));
                         }
                     });
 
