@@ -10,6 +10,7 @@ import lombok.Data;
 public class Params {
     int localPort = Integer.parseInt(System.getProperty("localPort", "3080"));
     String localHost = System.getProperty("localHost", "127.0.0.1");
+    int httpPort = Integer.parseInt(System.getProperty("httpPort", "9999"));
     String remoteHost = System.getProperty("remoteHost", "127.0.0.1");
     int remotePort = Integer.parseInt(System.getProperty("remotePort", "2080"));
     String udpHost = System.getProperty("udpHost", "127.0.0.1");
