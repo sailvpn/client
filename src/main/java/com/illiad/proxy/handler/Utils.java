@@ -4,11 +4,11 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http.HttpRequest;
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.socksx.v5.Socks5AddressType;
 import io.netty.util.NetUtil;
+import io.netty.util.ReferenceCountUtil;
 import org.springframework.stereotype.Component;
 
 import java.net.*;
@@ -25,6 +25,14 @@ public class Utils {
     public final int NET_IN_SIZE = 1310720;
     public final int APP_IN_SIZE = 1310720;
     public final int FRAGMENT_SIZE = 1300;
+    public final String HTTP = "http://";
+    public final String HTTPS = "https://";
+    public final String SLASH = "/";
+    public final String QUESTION = "?";
+    public final String ESTABLISHED = "Connection Established";
+    public final String PROXY_AUTHORIZATION = "Proxy-Authorization";
+    public final String PROXY_AUTHENTICATE = "Proxy-Authenticate";
+    public final String PROXY_CONNECTION = "Proxy-Connection";
 
     /**
      * Closes the specified channel after all queued write requests are flushed.
@@ -135,6 +143,65 @@ public class Utils {
         // For a more robust proxy, you might need to determine this contextually
         // or check for an HTTPS connection.
         return 80; // Default HTTP port
+    }
+
+    /**
+     *
+     * @param req HttpRequest
+     * @return
+     */
+    public ByteBuf encodeReq(HttpRequest req) {
+        EmbeddedChannel enc = new EmbeddedChannel(new HttpRequestEncoder());
+        try {
+            enc.writeOutbound(req);
+
+            ByteBuf buf = Unpooled.buffer();
+            Object o;
+            while ((o = enc.readOutbound()) != null) {
+                if (o instanceof ByteBuf) {
+                    buf.writeBytes((ByteBuf) o);
+                    ((ByteBuf) o).release();
+                } else {
+                    // encoder should emit ByteBufs, but release any other reference-counted objects
+                    ReferenceCountUtil.release(o);
+                }
+            }
+
+            return buf;
+        } finally {
+            enc.finish();
+        }
+    }
+
+    /**
+     *
+     * @param resp FullHttpResponse
+     * @return
+     */
+    public ByteBuf encodeRes(FullHttpResponse resp) {
+        // Use an EmbeddedChannel with HttpResponseEncoder to produce wire-format ByteBufs
+        EmbeddedChannel encoder = new EmbeddedChannel(new HttpResponseEncoder());
+        try {
+            // Retain before writing so the caller's reference is unaffected
+            encoder.writeOutbound(resp.retain());
+
+            // Collect outbound fragments into a single buffer
+            ByteBuf buf = Unpooled.buffer();
+            Object chunk;
+            while ((chunk = encoder.readOutbound()) != null) {
+                if (chunk instanceof ByteBuf) {
+                    ByteBuf bb = (ByteBuf) chunk;
+                    buf.writeBytes(bb);
+                    ReferenceCountUtil.release(bb);
+                } else {
+                    // unlikely, but release any other types
+                    ReferenceCountUtil.release(chunk);
+                }
+            }
+            return buf;
+        } finally {
+            encoder.close();
+        }
     }
 
 
