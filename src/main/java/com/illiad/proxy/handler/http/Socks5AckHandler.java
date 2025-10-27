@@ -23,7 +23,7 @@ public class Socks5AckHandler extends SimpleChannelInboundHandler<Socks5CommandR
     private final ParamBus bus;
     private final HttpRequest initialReq;
     private URI parsed;
-    private StringBuffer newUri;
+    private StringBuffer newUri = ;
     private StringBuffer query;
 
     public Socks5AckHandler(ChannelHandlerContext frontendCtx, ParamBus bus, HttpRequest initialReq) {
@@ -44,60 +44,71 @@ public class Socks5AckHandler extends SimpleChannelInboundHandler<Socks5CommandR
             frontendPipeline.addLast(new RelayHandler(backend, bus.utils));
             backendPipeline.addLast(new RelayHandler(frontend, bus.utils));
             String prefix = bus.namer.getPrefix();
+            // backend handlers are socks5-related, must be removed A.S.A.P
             // remove all handlers except SslHandler from backendPipeline
             for (String name : backendPipeline.names()) {
                 if (name.startsWith(prefix)) {
                     backendPipeline.remove(name);
                 }
             }
-            // remove all handlers from the frontendPipeLine
+
+            /**
+             * frontend handlers are HTTP codecs, and will still be needed in the scenario of HTTP CONNECT,
+             */
+
+            // If the original request was a CONNECT, reply 200 to frontend and start tunneling.
+            if (initialReq.method().equals(HttpMethod.CONNECT)) {
+                // no body, just flush the status then start raw relay (RelayHandler is in place)
+                try {
+                    frontendCtx.writeAndFlush(new DefaultFullHttpResponse(
+                            HttpVersion.HTTP_1_1,
+                            HttpResponseStatus.valueOf(200, bus.utils.ESTABLISHED)
+                    )).sync();
+                } catch (InterruptedException e) {
+                    frontendCtx.fireExceptionCaught(e);
+                }
+
+            } else {
+
+                // For normal HTTP requests: convert proxy-style absolute-URI to origin-form if needed,
+                // strip proxy-specific headers, retain and forward the request.
+                String uri = initialReq.uri();
+                if (uri.startsWith(bus.utils.HTTPS) || uri.startsWith(bus.utils.HTTP)) {
+                    try {
+                        parsed = new URI(uri);
+                        newUri.append(parsed.getRawPath());
+                        query.append(parsed.getRawQuery());
+                        if (newUri.isEmpty()) {
+                            newUri.append(bus.utils.SLASH);
+                        }
+                        if (!query.isEmpty()) {
+                            newUri.append(bus.utils.QUESTION).append(query);
+                        }
+                        // setUri is available on Netty's HttpRequest implementations
+                        initialReq.setUri(newUri.toString());
+                    } catch (URISyntaxException ignore) {
+                        // leave original uri if parsing fails
+                    }
+                }
+
+                // remove proxy headers that should not be forwarded to origin
+                HttpHeaders headers = initialReq.headers();
+                headers.remove(bus.utils.PROXY_AUTHORIZATION);
+                headers.remove(bus.utils.PROXY_AUTHENTICATE);
+                headers.remove(bus.utils.PROXY_CONNECTION);
+                // keep Host header as-is for origin server
+
+                // retain before forwarding to avoid premature release (message lifecycle managed by Netty)
+                ReferenceCountUtil.retain(initialReq);
+                backend.writeAndFlush(initialReq);
+            }
+
+            // frontend handlers can now be safely removed
             for (String name : frontendPipeline.names()) {
                 if (name.startsWith(prefix)) {
                     frontendPipeline.remove(name);
                 }
             }
-
-            // If the original request was a CONNECT, reply 200 to frontend and start tunneling.
-            if (initialReq.method().equals(HttpMethod.CONNECT)) {
-                // no body, just flush the status then start raw relay (RelayHandler is in place)
-                frontendCtx.writeAndFlush(new DefaultFullHttpResponse(
-                        HttpVersion.HTTP_1_1,
-                        HttpResponseStatus.valueOf(200, bus.utils.ESTABLISHED)
-                ));
-                return;
-            }
-
-            // For normal HTTP requests: convert proxy-style absolute-URI to origin-form if needed,
-            // strip proxy-specific headers, retain and forward the request.
-            String uri = initialReq.uri();
-            if (uri.startsWith(bus.utils.HTTPS) || uri.startsWith(bus.utils.HTTP)) {
-                try {
-                    parsed = new URI(uri);
-                    newUri.append(parsed.getRawPath());
-                    query.append(parsed.getRawQuery());
-                    if (newUri.isEmpty()) {
-                        newUri.append(bus.utils.SLASH);
-                    }
-                    if (!query.isEmpty()) {
-                        newUri.append(bus.utils.QUESTION).append(query);
-                    }
-                    // setUri is available on Netty's HttpRequest implementations
-                    initialReq.setUri(newUri.toString());
-                } catch (URISyntaxException ignore) {
-                    // leave original uri if parsing fails
-                }
-            }
-
-            // remove proxy headers that should not be forwarded to origin
-            HttpHeaders headers = initialReq.headers();
-            headers.remove(bus.utils.PROXY_AUTHORIZATION);
-            headers.remove(bus.utils.PROXY_AUTHENTICATE);
-            headers.remove(bus.utils.PROXY_CONNECTION);
-            // keep Host header as-is for origin server
-
-            // retain before forwarding to avoid premature release (message lifecycle managed by Netty)
-            ReferenceCountUtil.retain(initialReq);
-            backend.writeAndFlush(initialReq);
         } else {
             frontendCtx.writeAndFlush(new DefaultFullHttpResponse(
                     HttpVersion.HTTP_1_1,
