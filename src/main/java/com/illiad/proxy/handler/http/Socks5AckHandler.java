@@ -2,6 +2,7 @@ package com.illiad.proxy.handler.http;
 
 import com.illiad.proxy.ParamBus;
 import com.illiad.proxy.handler.v5.RelayHandler;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
@@ -9,7 +10,6 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.socksx.v5.Socks5CommandResponse;
 import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
-import io.netty.util.ReferenceCountUtil;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -22,9 +22,6 @@ public class Socks5AckHandler extends SimpleChannelInboundHandler<Socks5CommandR
     private final ChannelHandlerContext frontendCtx;
     private final ParamBus bus;
     private final HttpRequest initialReq;
-    private URI parsed;
-    private StringBuffer newUri = ;
-    private StringBuffer query;
 
     public Socks5AckHandler(ChannelHandlerContext frontendCtx, ParamBus bus, HttpRequest initialReq) {
         this.frontendCtx = frontendCtx;
@@ -44,44 +41,45 @@ public class Socks5AckHandler extends SimpleChannelInboundHandler<Socks5CommandR
             frontendPipeline.addLast(new RelayHandler(backend, bus.utils));
             backendPipeline.addLast(new RelayHandler(frontend, bus.utils));
             String prefix = bus.namer.getPrefix();
-            // backend handlers are socks5-related, must be removed A.S.A.P
-            // remove all handlers except SslHandler from backendPipeline
+            // remove all handlers except SslHandler, RelayHandler from backendPipeline
             for (String name : backendPipeline.names()) {
                 if (name.startsWith(prefix)) {
                     backendPipeline.remove(name);
                 }
             }
 
-            /**
-             * frontend handlers are HTTP codecs, and will still be needed in the scenario of HTTP CONNECT,
-             */
+            // remove all handlers, except RelayHandler from frontendPipeline
+            for (String name : frontendPipeline.names()) {
+                if (name.startsWith(prefix)) {
+                    frontendPipeline.remove(name);
+                }
+            }
 
-            // If the original request was a CONNECT, reply 200 to frontend and start tunneling.
+            // If the original request was a CONNECT.
             if (initialReq.method().equals(HttpMethod.CONNECT)) {
                 // no body, just flush the status then start raw relay (RelayHandler is in place)
-                try {
-                    frontendCtx.writeAndFlush(new DefaultFullHttpResponse(
-                            HttpVersion.HTTP_1_1,
-                            HttpResponseStatus.valueOf(200, bus.utils.ESTABLISHED)
-                    )).sync();
-                } catch (InterruptedException e) {
-                    frontendCtx.fireExceptionCaught(e);
-                }
+                // send 200 OK to frontend
+                ByteBuf responseBuf = bus.utils.encodeRes(
+                        new DefaultFullHttpResponse(
+                                HttpVersion.HTTP_1_1,
+                                HttpResponseStatus.valueOf(200, bus.utils.ESTABLISHED)
+                        ));
+                frontendCtx.writeAndFlush(responseBuf);
 
             } else {
 
                 // For normal HTTP requests: convert proxy-style absolute-URI to origin-form if needed,
-                // strip proxy-specific headers, retain and forward the request.
+                // strip proxy-specific headers, and forward the request.
                 String uri = initialReq.uri();
                 if (uri.startsWith(bus.utils.HTTPS) || uri.startsWith(bus.utils.HTTP)) {
                     try {
-                        parsed = new URI(uri);
-                        newUri.append(parsed.getRawPath());
-                        query.append(parsed.getRawQuery());
+                        URI parsed = new URI(uri);
+                        StringBuffer newUri = new StringBuffer(parsed.getRawPath());
                         if (newUri.isEmpty()) {
                             newUri.append(bus.utils.SLASH);
                         }
-                        if (!query.isEmpty()) {
+                        String query = parsed.getRawQuery();
+                        if (query != null) {
                             newUri.append(bus.utils.QUESTION).append(query);
                         }
                         // setUri is available on Netty's HttpRequest implementations
@@ -98,22 +96,18 @@ public class Socks5AckHandler extends SimpleChannelInboundHandler<Socks5CommandR
                 headers.remove(bus.utils.PROXY_CONNECTION);
                 // keep Host header as-is for origin server
 
-                // retain before forwarding to avoid premature release (message lifecycle managed by Netty)
-                ReferenceCountUtil.retain(initialReq);
-                backend.writeAndFlush(initialReq);
+                ByteBuf encodedReq = bus.utils.encodeReq(initialReq);
+                backend.writeAndFlush(encodedReq);
             }
 
-            // frontend handlers can now be safely removed
-            for (String name : frontendPipeline.names()) {
-                if (name.startsWith(prefix)) {
-                    frontendPipeline.remove(name);
-                }
-            }
         } else {
-            frontendCtx.writeAndFlush(new DefaultFullHttpResponse(
-                    HttpVersion.HTTP_1_1,
-                    HttpResponseStatus.valueOf(502, response.status().toString())
-            ));
+            // send error response to frontend
+            ByteBuf errorBuf = bus.utils.encodeRes(
+                    new DefaultFullHttpResponse(
+                            HttpVersion.HTTP_1_1,
+                            HttpResponseStatus.valueOf(502, response.status().toString())
+                    ));
+            frontendCtx.writeAndFlush(errorBuf);
             frontendCtx.fireExceptionCaught(new Exception(response.status().toString()));
             bus.utils.closeOnFlush(frontendCtx.channel());
             bus.utils.closeOnFlush(ctx.channel());
