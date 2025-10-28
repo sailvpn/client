@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class Starter {
 
-    private ParamBus bus;
+    private final ParamBus bus;
 
     public Starter(ParamBus bus) {
         this.bus = bus;
