@@ -17,7 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
-class SocksStarterTest {
+class StarterTest {
 
     @Mock
     private Params params;
@@ -26,7 +26,7 @@ class SocksStarterTest {
     @Mock
     private V5CommandHandler v5CommandHandler;
     @InjectMocks
-    private SocksStarter starter;
+    private Starter starter;
 
     @BeforeEach
     void setUp() {
