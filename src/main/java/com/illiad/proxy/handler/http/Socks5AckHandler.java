@@ -38,8 +38,8 @@ public class Socks5AckHandler extends SimpleChannelInboundHandler<Socks5CommandR
             final Channel backend = ctx.channel();
             final ChannelPipeline backendPipeline = backend.pipeline();
             // setup Socks direct channel relay between frontend and backend
-            frontendPipeline.addLast(new RelayHandler(backend, bus.utils));
-            backendPipeline.addLast(new RelayHandler(frontend, bus.utils));
+            frontendPipeline.addLast(new RelayHandler(backend, bus));
+            backendPipeline.addLast(new RelayHandler(frontend, bus));
             String prefix = bus.namer.getPrefix();
             // remove all handlers except SslHandler, RelayHandler from backendPipeline
             for (String name : backendPipeline.names()) {

@@ -1,5 +1,6 @@
 package com.illiad.proxy.handler.v5;
 
+import com.illiad.proxy.ParamBus;
 import com.illiad.proxy.handler.Utils;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -9,11 +10,11 @@ import io.netty.util.ReferenceCountUtil;
 public final class RelayHandler extends ChannelInboundHandlerAdapter {
 
     private final Channel relayChannel;
-    private final Utils utils;
+    private final ParamBus bus;
 
-    public RelayHandler(Channel relayChannel, Utils utils) {
+    public RelayHandler(Channel relayChannel, ParamBus bus) {
         this.relayChannel = relayChannel;
-        this.utils = utils;
+        this.bus = bus;
     }
 
     @Override
@@ -28,7 +29,7 @@ public final class RelayHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
         if (relayChannel.isActive()) {
-            utils.closeOnFlush(relayChannel);
+            bus.utils.closeOnFlush(relayChannel);
         }
     }
 
