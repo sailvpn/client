@@ -52,6 +52,96 @@ That's it! Your proxy is now running with automatic token management.
 
 ---
 
+## Manual Token Mode (Token Sharing)
+
+### When to Use Manual Mode
+
+Use manual token mode when you need to:
+- **Share one token across multiple devices** (PC, phone, tablet)
+- **Share a token with family members**
+- **Prevent auto-renewal disruption** on other devices
+- **Manage tokens externally** (e.g., with a script or token manager)
+
+### How Manual Mode Works
+
+When you configure **only** `params.jwtToken` (without `username`/`password`):
+- ✅ Client uses the provided token
+- ✅ Auto-renewal is **DISABLED automatically**
+- ✅ Token is used until it expires
+- ✅ No disruption to other devices using the same token
+
+### Setup Manual Token Mode
+
+**Step 1: Generate a Token** (one time, from any device):
+
+```bash
+curl -k -X POST "https://your-server.com/api/auth/token/generate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "alice",
+    "password": "SecurePassword123!",
+    "expirationMinutes": 43200
+  }'
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6ImExYjJjM2Q0...",
+    "expiresAt": 1735862400000
+  }
+}
+```
+
+**Step 2: Configure on ALL Devices** with the same token:
+
+```properties
+# application.properties (on each device)
+params.crypto=JWT
+params.jwtToken=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6ImExYjJjM2Q0...
+
+# NO username/password = Manual mode (auto-renewal disabled)
+params.remoteHost=your-server.com
+params.remotePort=443
+```
+
+**Step 3: Start the Client** on each device:
+
+```bash
+./gradlew bootRun
+```
+
+**Expected logs:**
+```
+Using manual JWT token from configuration
+Manual token mode: Auto-renewal is DISABLED to allow token sharing across devices
+Token will be used until expiration. Renewal must be done manually.
+SOCKS5 server started on port 2080
+HTTP server started on port 9999
+```
+
+### Advantages
+
+- ✅ **One token for all devices** - PC, phone, tablet all use the same token
+- ✅ **No renewal disruption** - Auto-renewal disabled, no device invalidates others' tokens
+- ✅ **Family sharing** - Multiple family members can share one token
+- ✅ **Simple management** - Update token on all devices before expiration
+
+### Token Expiration Management
+
+Since auto-renewal is disabled in manual mode:
+
+1. **Set a reminder** to update the token before it expires (e.g., every 25 days for 30-day token)
+2. **Generate a new token** using the curl command above
+3. **Update `params.jwtToken`** in `application.properties` on ALL devices
+4. **Restart the client** on each device
+
+**Tip:** Save the curl command in a script for easy token regeneration!
+
+---
+
 ## Configuration Options
 
 ### Core Settings

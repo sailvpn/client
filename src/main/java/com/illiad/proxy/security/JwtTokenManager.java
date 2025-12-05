@@ -57,20 +57,21 @@ public class JwtTokenManager {
                 // Fall back to configured token if available
                 if (params.getJwtToken() != null && !params.getJwtToken().isEmpty()) {
                     currentToken.set(params.getJwtToken());
-                    System.out.println("Using pre-configured JWT token from properties");
+                    System.out.println("Using pre-configured JWT token from properties (fallback)");
                 } else {
                     throw new IllegalStateException("Failed to acquire JWT token and no fallback token configured");
                 }
             }
         } else if (params.getJwtToken() != null && !params.getJwtToken().isEmpty()) {
-            // Use pre-configured token
+            // Manual token mode - use pre-configured token WITHOUT auto-renewal
             currentToken.set(params.getJwtToken());
-            System.out.println("Using pre-configured JWT token");
-            
-            // Still enable renewal if configured
-            if (params.isTokenRenewalEnabled()) {
-                startPeriodicRenewal();
-            }
+            System.out.println("Using manual JWT token from configuration");
+            System.out.println("Manual token mode: Auto-renewal is DISABLED to allow token sharing across devices");
+            System.out.println("Token will be used until expiration. Renewal must be done manually.");
+
+            // Do NOT start auto-renewal in manual mode
+            // This allows users to share tokens across multiple devices/family members
+            // without one device's renewal invalidating tokens on other devices
         } else {
             throw new IllegalStateException("JWT authentication enabled but no credentials or token provided");
         }
