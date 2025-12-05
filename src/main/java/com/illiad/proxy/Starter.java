@@ -3,6 +3,7 @@ package com.illiad.proxy;
 import com.illiad.proxy.codec.v5.V5InitReqDecoder;
 import com.illiad.proxy.handler.http.FrontHandler;
 import com.illiad.proxy.handler.v5.V5CommandHandler;
+import com.illiad.proxy.security.JwtTokenManager;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -26,6 +27,7 @@ import java.util.List;
 public class Starter {
 
     private final ParamBus bus;
+    private final JwtTokenManager tokenManager;
     private final List<Channel> channels = new ArrayList<>();
 
     // Create separate, independent EventLoopGroups for each server
@@ -35,12 +37,16 @@ public class Starter {
     private final EventLoopGroup httpBossGroup = new NioEventLoopGroup(1);
     private final EventLoopGroup httpWorkerGroup = new NioEventLoopGroup(2);
 
-    public Starter(ParamBus bus) {
+    public Starter(ParamBus bus, JwtTokenManager tokenManager) {
         this.bus = bus;
+        this.tokenManager = tokenManager;
     }
 
     @PostConstruct
     public void startServers() throws InterruptedException {
+        // Initialize JWT token manager (acquire token and start renewal if needed)
+        tokenManager.initialize();
+
         startSocks();
         startHttp();
     }
@@ -53,6 +59,9 @@ public class Starter {
         socksBossGroup.shutdownGracefully();
         httpWorkerGroup.shutdownGracefully();
         httpBossGroup.shutdownGracefully();
+
+        // Shutdown token manager
+        tokenManager.shutdown();
     }
 
     /**
