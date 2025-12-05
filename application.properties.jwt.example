@@ -1,6 +1,5 @@
 # JWT Authentication Example Configuration
-# This example shows how to configure the proxy client to automatically
-# acquire and renew JWT tokens from the remote server
+# This example shows how to configure the proxy client for JWT token management
 
 # Remote server connection
 params.remoteHost=your-server.com
@@ -13,25 +12,25 @@ params.httpPort=9999
 # Enable JWT authentication
 params.crypto=JWT
 
-# Option 1: Automatic token acquisition with username/password (RECOMMENDED)
-# The client will automatically acquire a JWT token at startup and renew it periodically
+# ===== OPTION 1: AUTOMATIC MODE (Single User/Device) =====
+# The client will automatically acquire and renew JWT tokens
+params.tokenMode=auto
 params.username=alice
 params.password=SecurePassword123!
 
-# Token expiration (default: 43200 = 30 days)
-params.tokenExpirationMinutes=43200
+# Token settings (automatic mode)
+params.tokenExpirationMinutes=43200        # 30 days (default)
+params.tokenRenewalEnabled=true            # Enable auto-renewal (default)
+params.tokenRenewalIntervalMinutes=10      # Renew every 10 minutes (default)
 
-# Automatic token renewal (default: true)
-params.tokenRenewalEnabled=true
-
-# Token renewal interval in minutes (default: 10 minutes)
-# The client will renew the token every 10 minutes to ensure fresh tokens
-params.tokenRenewalIntervalMinutes=10
-
-# Option 2: Manual token configuration (alternative to username/password)
-# Use this if you prefer to manually manage tokens
+# ===== OPTION 2: MANUAL MODE (Multiple Devices/Family Sharing) =====
+# Uncomment these lines to use manual mode instead
+# params.tokenMode=manual
 # params.jwtToken=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6ImExYjJjM2Q0...
-# params.tokenRenewalEnabled=true  # Still enable renewal using the current token
-
-# Note: If both username/password and jwtToken are provided, username/password takes precedence
+#
+# Manual mode:
+# - No auto-renewal (prevents disrupting other devices)
+# - Same token can be shared across unlimited devices
+# - Perfect for family sharing
+# - Update token manually before expiration
 

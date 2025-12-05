@@ -167,12 +167,20 @@ Token will be used until expiration. Renewal must be done manually.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `username` | String | `""` | Username for auto-acquisition |
-| `password` | String | `""` | Password for auto-acquisition |
+| `tokenMode` | String | `"auto"` | Token management mode: `"auto"` or `"manual"` |
+| `username` | String | `""` | Username for auto-acquisition (required if tokenMode=auto) |
+| `password` | String | `""` | Password for auto-acquisition (required if tokenMode=auto) |
 | `tokenExpirationMinutes` | int | `43200` | Token validity (30 days) |
-| `tokenRenewalEnabled` | boolean | `true` | Enable auto-renewal |
-| `tokenRenewalIntervalMinutes` | int | `10` | Renewal frequency (10 minutes) |
-| `jwtToken` | String | `""` | Manual token (fallback) |
+| `tokenRenewalEnabled` | boolean | `true` | Enable auto-renewal (only in auto mode) |
+| `tokenRenewalIntervalMinutes` | int | `10` | Renewal frequency (10 minutes, only in auto mode) |
+| `jwtToken` | String | `""` | Manual token (required if tokenMode=manual) |
+
+### Token Mode Values
+
+| Mode | Description | Required Config | Auto-Renewal |
+|------|-------------|-----------------|--------------|
+| `auto` | Automatic token acquisition and renewal | username, password | ✅ Enabled (if tokenRenewalEnabled=true) |
+| `manual` | Manual token management, no auto-renewal | jwtToken | ❌ Disabled |
 
 ---
 
@@ -185,6 +193,7 @@ Token will be used until expiration. Renewal must be done manually.
 1. **Edit** `src/main/resources/application.properties`:
    ```properties
    params.crypto=JWT
+   params.tokenMode=auto
    params.username=alice
    params.password=SecurePassword123!
    params.remoteHost=your-server.com
@@ -200,6 +209,16 @@ Token will be used until expiration. Renewal must be done manually.
 - ✅ Acquires token at startup
 - ✅ Renews token every 10 minutes
 - ✅ Runs indefinitely
+
+**Log output:**
+```
+Automatic token mode enabled (tokenMode=auto)
+Auto-acquiring JWT token for user: alice
+Successfully acquired JWT token
+Starting JWT token renewal every 10 minutes
+SOCKS5 server started on port 2080
+HTTP server started on port 9999
+```
 
 ### Manual Mode (Multiple Devices/Shared Token)
 
@@ -223,8 +242,8 @@ curl -k -X POST "https://your-server.com/api/auth/token/generate" \
 **Step 2: Configure on ALL devices** with the same token:
 ```properties
 params.crypto=JWT
+params.tokenMode=manual
 params.jwtToken=eyJhbGciOiJIUzI1NiJ9...
-# NO username/password = Manual mode
 ```
 
 **Step 3: Start** on each device:
@@ -237,6 +256,16 @@ params.jwtToken=eyJhbGciOiJIUzI1NiJ9...
 - ✅ No auto-renewal (prevents disruption)
 - ✅ Token valid for 30 days
 - ✅ Manually update token before expiration
+
+**Log output:**
+```
+Manual token mode enabled (tokenMode=manual)
+Using JWT token from configuration
+Auto-renewal is DISABLED to allow token sharing across devices
+Token will be used until expiration. Renewal must be done manually.
+SOCKS5 server started on port 2080
+HTTP server started on port 9999
+```
 
 **Token Expiration Warning:**
 - Set a reminder to manually update token before it expires (e.g., every 25 days)

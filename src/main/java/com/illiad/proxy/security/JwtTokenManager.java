@@ -38,10 +38,24 @@ public class JwtTokenManager {
             return;
         }
 
-        // Check if we should auto-acquire token
-        if (params.getUsername() != null && !params.getUsername().isEmpty() &&
-            params.getPassword() != null && !params.getPassword().isEmpty()) {
-            
+        String tokenMode = params.getTokenMode().toLowerCase();
+
+        // Validate token mode
+        if (!tokenMode.equals("auto") && !tokenMode.equals("manual")) {
+            throw new IllegalStateException("Invalid tokenMode: " + tokenMode + ". Must be 'auto' or 'manual'");
+        }
+
+        if (tokenMode.equals("auto")) {
+            // Automatic mode - require username/password
+            if (params.getUsername() == null || params.getUsername().isEmpty() ||
+                params.getPassword() == null || params.getPassword().isEmpty()) {
+                throw new IllegalStateException(
+                    "Automatic token mode (tokenMode=auto) requires username and password. " +
+                    "Either provide credentials or set tokenMode=manual"
+                );
+            }
+
+            System.out.println("Automatic token mode enabled (tokenMode=auto)");
             System.out.println("Auto-acquiring JWT token for user: " + params.getUsername());
             
             // Acquire initial token
@@ -51,6 +65,8 @@ public class JwtTokenManager {
                 // Start periodic renewal if enabled
                 if (params.isTokenRenewalEnabled()) {
                     startPeriodicRenewal();
+                } else {
+                    System.out.println("Token auto-renewal is disabled (tokenRenewalEnabled=false)");
                 }
             } else {
                 System.err.println("Failed to acquire initial JWT token");
@@ -62,18 +78,24 @@ public class JwtTokenManager {
                     throw new IllegalStateException("Failed to acquire JWT token and no fallback token configured");
                 }
             }
-        } else if (params.getJwtToken() != null && !params.getJwtToken().isEmpty()) {
-            // Manual token mode - use pre-configured token WITHOUT auto-renewal
+        } else {
+            // Manual mode - use pre-configured token WITHOUT auto-renewal
+            if (params.getJwtToken() == null || params.getJwtToken().isEmpty()) {
+                throw new IllegalStateException(
+                    "Manual token mode (tokenMode=manual) requires jwtToken to be configured. " +
+                    "Either provide a token or set tokenMode=auto with username/password"
+                );
+            }
+
             currentToken.set(params.getJwtToken());
-            System.out.println("Using manual JWT token from configuration");
-            System.out.println("Manual token mode: Auto-renewal is DISABLED to allow token sharing across devices");
+            System.out.println("Manual token mode enabled (tokenMode=manual)");
+            System.out.println("Using JWT token from configuration");
+            System.out.println("Auto-renewal is DISABLED to allow token sharing across devices");
             System.out.println("Token will be used until expiration. Renewal must be done manually.");
 
             // Do NOT start auto-renewal in manual mode
             // This allows users to share tokens across multiple devices/family members
             // without one device's renewal invalidating tokens on other devices
-        } else {
-            throw new IllegalStateException("JWT authentication enabled but no credentials or token provided");
         }
     }
 
