@@ -28,6 +28,11 @@ public class Params {
     String password = System.getProperty("password", "");
     int tokenExpirationMinutes = Integer.parseInt(System.getProperty("tokenExpirationMinutes", "43200")); // 30 days default
 
+    // JWT token mode: "auto" or "manual"
+    // - "auto": Client acquires and renews tokens automatically using username/password
+    // - "manual": Client uses provided jwtToken, no auto-renewal (for token sharing)
+    String tokenMode = System.getProperty("tokenMode", "auto"); // default: auto
+
     // JWT auto-renewal settings
     boolean tokenRenewalEnabled = Boolean.parseBoolean(System.getProperty("tokenRenewalEnabled", "true"));
     int tokenRenewalIntervalMinutes = Integer.parseInt(System.getProperty("tokenRenewalIntervalMinutes", "10")); // 10 minutes default

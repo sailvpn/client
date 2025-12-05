@@ -22,6 +22,9 @@ The proxy client now supports **automatic JWT token acquisition and renewal**, e
 # Enable JWT authentication
 params.crypto=JWT
 
+# Set mode to automatic
+params.tokenMode=auto
+
 # Your credentials
 params.username=alice
 params.password=SecurePassword123!
@@ -64,11 +67,18 @@ Use manual token mode when you need to:
 
 ### How Manual Mode Works
 
-When you configure **only** `params.jwtToken` (without `username`/`password`):
-- ✅ Client uses the provided token
+When you set `params.tokenMode=manual`:
+- ✅ Client uses the provided `jwtToken`
 - ✅ Auto-renewal is **DISABLED automatically**
 - ✅ Token is used until it expires
 - ✅ No disruption to other devices using the same token
+
+**Configuration requirement:**
+```properties
+params.tokenMode=manual
+params.jwtToken=eyJhbGci...
+# username/password NOT required
+```
 
 ### Setup Manual Token Mode
 
@@ -100,9 +110,9 @@ Response:
 ```properties
 # application.properties (on each device)
 params.crypto=JWT
+params.tokenMode=manual
 params.jwtToken=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6ImExYjJjM2Q0...
 
-# NO username/password = Manual mode (auto-renewal disabled)
 params.remoteHost=your-server.com
 params.remotePort=443
 ```
@@ -149,20 +159,25 @@ Since auto-renewal is disabled in manual mode:
 | Property | Default | Description |
 |----------|---------|-------------|
 | `params.crypto` | `SHA_256` | Set to `JWT` to enable JWT authentication |
-| `params.username` | `""` | Your username on the remote server |
-| `params.password` | `""` | Your password on the remote server |
+| `params.tokenMode` | `auto` | Token mode: `auto` (automatic) or `manual` (shared) |
+| `params.username` | `""` | Your username (required if tokenMode=auto) |
+| `params.password` | `""` | Your password (required if tokenMode=auto) |
 | `params.remoteHost` | `127.0.0.1` | Remote server hostname |
 | `params.remotePort` | `2080` | Remote server port |
 
-### Token Management Settings
+### Token Management Settings (Auto Mode Only)
 
 | Property | Default | Description |
 |----------|---------|-------------|
 | `params.tokenExpirationMinutes` | `43200` | Token validity period (30 days) |
-| `params.tokenRenewalEnabled` | `true` | Enable automatic token renewal |
-| `params.tokenRenewalIntervalMinutes` | `10` | How often to renew (10 minutes) |
+| `params.tokenRenewalEnabled` | `true` | Enable automatic token renewal (auto mode only) |
+| `params.tokenRenewalIntervalMinutes` | `10` | How often to renew (10 minutes, auto mode only) |
 
-### Manual Token (Legacy)
+### Manual Token Setting (Manual Mode Only)
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `params.jwtToken` | `""` | JWT token (required if tokenMode=manual) |
 
 | Property | Default | Description |
 |----------|---------|-------------|
