@@ -14,11 +14,21 @@ This directory contains documentation for the Illiad proxy client.
   - Step-by-step instructions
   - Troubleshooting guide
   - Security best practices
-- **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** - ⭐ Configuration file setup guide
+- **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** - ⭐ Configuration guide for **END USERS**
+  - For users who install packaged apps (JAR, DEB, TAR, ZIP)
   - Where to place config files on PC
   - File permissions and security
-  - Multiple configuration scenarios
-  - Environment variables vs config files
+  - Common scenarios (single PC, multiple PCs, family sharing)
+  - Simple troubleshooting
+
+### Developer Guides
+- **[CONFIGURATION_GUIDE_DEVELOPERS.md](CONFIGURATION_GUIDE_DEVELOPERS.md)** - ⭐ Configuration guide for **DEVELOPERS**
+  - For developers working with source code
+  - src/main/resources/application.properties
+  - Gradle/IDE integration
+  - Environment variables and Spring profiles
+  - Docker/Kubernetes configurations
+  - Testing configurations
 
 ### Technical Documentation
 - **[JWT_IMPLEMENTATION.md](JWT_IMPLEMENTATION.md)** - Implementation details for developers
