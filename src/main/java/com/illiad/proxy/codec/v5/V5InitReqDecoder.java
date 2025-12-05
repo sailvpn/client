@@ -25,6 +25,11 @@ public class V5InitReqDecoder extends ReplayingDecoder<V5InitReqDecoder.State> {
 
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
+
+        if (in.writerIndex() == in.readerIndex()) {
+            return;
+        }
+
         try {
             switch (state()) {
                 case INIT: {
