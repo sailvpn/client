@@ -1,126 +1,253 @@
-# Configuration File Setup Guide
+# Configuration File Setup Guide for End Users
 
-## Quick Start
+This guide is for users who have **installed** the proxy client (from JAR, DEB, TAR, etc.).
 
-### Step 1: Locate the Configuration File
+---
 
-The configuration file is named **`application.properties`** and should be placed in:
+## Quick Start (5 Minutes)
 
-```
-src/main/resources/application.properties
-```
+### Step 1: Find Where You Installed the Proxy
 
-**Full path example:**
-```
-/home/youruser/proxy/src/main/resources/application.properties
-```
+After unpacking/installing, you should have a folder like:
 
-### Step 2: Copy the Template
+- **Linux:** `/opt/proxy/` or `/usr/local/proxy/` or `~/proxy/`
+- **Windows:** `C:\Program Files\proxy\` or `C:\proxy\`
+- **macOS:** `/Applications/proxy/` or `~/Applications/proxy/`
 
-We've provided a template at **`config-template.properties`** in the project root.
-
-**Copy the template:**
-```bash
-cp config-template.properties src/main/resources/application.properties
-```
-
-### Step 3: Edit the Configuration
-
-Open the file with your favorite text editor:
-
+**Find your installation directory:**
 ```bash
 # Linux/macOS
-nano src/main/resources/application.properties
+ls -la ~/proxy/        # If installed in home directory
+ls -la /opt/proxy/     # If installed system-wide
 
-# Or use a GUI editor
-gedit src/main/resources/application.properties
-code src/main/resources/application.properties
+# Windows (PowerShell)
+dir C:\proxy\
+dir "C:\Program Files\proxy\"
 ```
 
-### Step 4: Set Your Values
+### Step 2: Create Your Configuration File
 
-Edit these required values:
+**Go to your installation directory:**
+```bash
+# Linux/macOS
+cd ~/proxy/
 
+# Windows (PowerShell)
+cd C:\proxy\
+```
+
+**Create a file named `application.properties`:**
+```bash
+# Linux/macOS
+nano application.properties
+
+# Windows - use Notepad
+notepad application.properties
+```
+
+### Step 3: Copy This Basic Configuration
+
+**For automatic mode (single PC):**
 ```properties
-# Replace with your actual server
-params.remoteHost=proxy.example.com
+# Server settings (REQUIRED - ask your admin for these)
+params.remoteHost=your-proxy-server.com
 params.remotePort=443
 
-# For automatic mode:
+# Authentication (REQUIRED - your login credentials)
+params.crypto=JWT
 params.tokenMode=auto
-params.username=your_actual_username
-params.password=your_actual_password
+params.username=your_username
+params.password=your_password
+
+# Local proxy ports (you can change these if needed)
+params.localPort=2080
+params.httpPort=9999
 ```
 
-### Step 5: Start the Client
+**Save the file!**
 
-```bash
-./gradlew bootRun
-```
+### Step 4: Run the Proxy
 
----
-
-## Configuration File Locations (PC)
-
-### Option 1: Default Location (Recommended)
-
-**Location:**
-```
-<project-root>/src/main/resources/application.properties
-```
-
-**Example paths:**
-- **Linux:** `/home/john/proxy/src/main/resources/application.properties`
-- **macOS:** `/Users/john/proxy/src/main/resources/application.properties`
-- **Windows:** `C:\Users\John\proxy\src\main\resources\application.properties`
-
-**Advantages:**
-- ✅ No command-line arguments needed
-- ✅ Spring Boot finds it automatically
-- ✅ Easiest to use
-
-**How to use:**
-```bash
-./gradlew bootRun
-```
-
----
-
-### Option 2: Custom Location (Advanced)
-
-**Location:** Anywhere on your PC
-
-**Example paths:**
-- **Linux:** `/etc/proxy/config.properties`
-- **Linux (user):** `~/.config/proxy/application.properties`
-- **macOS:** `~/Library/Application Support/proxy/config.properties`
-- **Windows:** `C:\ProgramData\proxy\config.properties`
-- **Windows (user):** `%APPDATA%\proxy\config.properties`
-
-**Advantages:**
-- ✅ Keep config separate from code
-- ✅ Easy to backup
-- ✅ Multiple configs for different scenarios
-
-**How to use:**
 ```bash
 # Linux/macOS
-./gradlew bootRun --spring.config.location=/etc/proxy/config.properties
+java -jar proxy.jar
+
+# Or if you have a startup script:
+./start-proxy.sh
+
+# Windows (double-click or PowerShell)
+java -jar proxy.jar
+
+# Or double-click:
+start-proxy.bat
+```
+
+### Step 5: Configure Your Browser
+
+Set your browser to use SOCKS5 proxy:
+- **Host:** `localhost`
+- **Port:** `2080`
+
+**Done!** Your proxy is now running.
+
+---
+
+## Where to Put the Configuration File
+
+### After Installing from JAR/DEB/TAR
+
+**The configuration file should be in the SAME directory as the proxy application.**
+
+#### Installation from TAR.GZ or ZIP
+
+You unpacked the file and got something like:
+```
+proxy/
+  ├── proxy.jar                    ← The main application
+  ├── start-proxy.sh               ← Startup script (Linux/macOS)
+  ├── start-proxy.bat              ← Startup script (Windows)
+  ├── config-template.properties   ← Example configuration
+  └── README.txt
+```
+
+**Create your `application.properties` HERE:**
+```
+proxy/
+  ├── proxy.jar
+  ├── application.properties       ← PUT YOUR CONFIG HERE
+  ├── start-proxy.sh
+  └── ...
+```
+
+**Commands:**
+```bash
+# Linux/macOS
+cd ~/proxy/                        # Go to installation directory
+cp config-template.properties application.properties  # Copy template
+nano application.properties        # Edit configuration
 
 # Windows
-gradlew.bat bootRun --spring.config.location=C:\ProgramData\proxy\config.properties
+cd C:\proxy\
+copy config-template.properties application.properties
+notepad application.properties
 ```
 
 ---
 
-### Option 3: Environment Variables (Most Secure)
+#### Installation from DEB (Debian/Ubuntu)
 
-**No config file needed!**
+After installing with `sudo dpkg -i proxy.deb`, files are in:
 
-**How to use:**
+```
+/opt/proxy/                        ← Installation directory
+  ├── proxy.jar
+  ├── start-proxy.sh
+  └── config-template.properties
+```
 
-**Linux/macOS:**
+**Create your configuration:**
 ```bash
+cd /opt/proxy/
+sudo cp config-template.properties application.properties
+sudo nano application.properties
+
+# Make it readable only by you
+sudo chmod 600 application.properties
+sudo chown $USER application.properties
+```
+
+---
+
+#### Installation from RPM (RedHat/CentOS/Fedora)
+
+After installing with `sudo rpm -i proxy.rpm`, files are in:
+
+```
+/opt/proxy/                        ← Installation directory
+  ├── proxy.jar
+  ├── start-proxy.sh
+  └── config-template.properties
+```
+
+**Create your configuration:**
+```bash
+cd /opt/proxy/
+sudo cp config-template.properties application.properties
+sudo nano application.properties
+sudo chmod 600 application.properties
+sudo chown $USER application.properties
+```
+
+---
+
+#### Installation on Windows (Installer or ZIP)
+
+After installation, files are typically in:
+```
+C:\Program Files\proxy\            ← or C:\proxy\
+  ├── proxy.jar
+  ├── start-proxy.bat
+  └── config-template.properties
+```
+
+**Create your configuration:**
+```cmd
+cd "C:\Program Files\proxy"
+copy config-template.properties application.properties
+notepad application.properties
+```
+
+Or just:
+1. Open File Explorer
+2. Navigate to `C:\Program Files\proxy\`
+3. Copy `config-template.properties`
+4. Rename copy to `application.properties`
+5. Right-click → Edit with Notepad
+
+---
+
+## Alternative: Using Custom Configuration Location
+
+If you want to keep your configuration file somewhere else (not in the installation directory):
+
+### Linux/macOS
+
+**Put your config anywhere:**
+```bash
+mkdir -p ~/.config/proxy/
+nano ~/.config/proxy/my-config.properties
+```
+
+**Run the proxy with custom config:**
+```bash
+cd ~/proxy/
+java -jar proxy.jar --spring.config.location=~/.config/proxy/my-config.properties
+```
+
+### Windows
+
+**Put your config anywhere:**
+```
+C:\Users\YourName\Documents\proxy-config.properties
+```
+
+**Run the proxy with custom config:**
+```cmd
+cd C:\proxy
+java -jar proxy.jar --spring.config.location=C:\Users\YourName\Documents\proxy-config.properties
+```
+
+---
+
+## Alternative: Using Environment Variables (Most Secure)
+
+**No config file needed!** Set environment variables instead.
+
+### Linux/macOS
+
+**Create a startup script** (e.g., `my-proxy-start.sh`):
+```bash
+#!/bin/bash
 export crypto=JWT
 export tokenMode=auto
 export username=alice
@@ -128,23 +255,21 @@ export password=SecurePass123
 export remoteHost=proxy.example.com
 export remotePort=443
 
-./gradlew bootRun
+cd ~/proxy/
+java -jar proxy.jar
 ```
 
-**Windows (PowerShell):**
-```powershell
-$env:crypto="JWT"
-$env:tokenMode="auto"
-$env:username="alice"
-$env:password="SecurePass123"
-$env:remoteHost="proxy.example.com"
-$env:remotePort="443"
-
-.\gradlew.bat bootRun
+**Make it executable and run:**
+```bash
+chmod +x my-proxy-start.sh
+./my-proxy-start.sh
 ```
 
-**Windows (CMD):**
-```cmd
+### Windows
+
+**Create a batch file** (e.g., `my-proxy-start.bat`):
+```batch
+@echo off
 set crypto=JWT
 set tokenMode=auto
 set username=alice
@@ -152,235 +277,186 @@ set password=SecurePass123
 set remoteHost=proxy.example.com
 set remotePort=443
 
-gradlew.bat bootRun
+cd C:\proxy
+java -jar proxy.jar
 ```
 
+**Double-click to run.**
+
 **Advantages:**
-- ✅ Most secure (passwords not in files)
-- ✅ No config file to manage
-- ✅ Easy to change without editing files
+- ✅ Passwords not stored in files
+- ✅ Easy to change without editing config files
 
 ---
 
-## File Permissions (Security)
+## Protecting Your Configuration File (Security)
+
+**Your configuration file contains your password!** Protect it.
 
 ### Linux/macOS
 
-**Recommended permissions:**
+Make the file readable only by you:
 ```bash
-chmod 600 src/main/resources/application.properties
-```
+cd ~/proxy/                        # Go to where your config is
+chmod 600 application.properties   # Only you can read/write
 
-This ensures only the owner can read/write the file (passwords are protected).
-
-**Verify:**
-```bash
-ls -l src/main/resources/application.properties
-# Should show: -rw-------
+# Verify:
+ls -l application.properties
+# Should show: -rw------- (only owner can read/write)
 ```
 
 ### Windows
 
-**Set file permissions via GUI:**
+**Option 1: GUI (Easiest)**
+1. Right-click `application.properties`
+2. Properties → Security → Advanced
+3. Click "Disable inheritance"
+4. Choose "Remove all inherited permissions"
+5. Click "Add"
+6. Type your username → Check Names → OK
+7. Check "Full control" → OK
 
-1. Right-click on `application.properties`
-2. Properties → Security tab
-3. Advanced → Disable inheritance
-4. Remove all users except your account
-5. Give your account Full Control
-
-**Or use command line:**
+**Option 2: Command Line**
 ```cmd
 icacls application.properties /inheritance:r /grant:r "%USERNAME%:F"
 ```
 
 ---
 
-## Configuration for Different Scenarios
+## Common Configurations
 
-### Scenario 1: Personal PC (Work from Home)
+### Scenario 1: I Use the Proxy on ONE Computer
 
-**Location:** `src/main/resources/application.properties`
+**Best option:** Automatic mode (easier!)
 
-**Configuration:**
+**File:** `application.properties` in installation directory
+
 ```properties
+# Server (ask your admin)
+params.remoteHost=proxy-server.com
+params.remotePort=443
+
+# Your login
 params.crypto=JWT
 params.tokenMode=auto
 params.username=alice
-params.password=SecurePass123!
-params.remoteHost=company-proxy.example.com
-params.remotePort=443
+params.password=MyPassword123
+
+# Local ports
 params.localPort=2080
 params.httpPort=9999
 ```
 
-**Usage:**
+**Start:**
 ```bash
-./gradlew bootRun
-# Proxy runs automatically with token renewal
-```
-
----
-
-### Scenario 2: Multiple PCs (Home + Work)
-
-**Generate token once:**
-```bash
-curl -k -X POST "https://company-proxy.example.com/api/auth/token/generate" \
-  -H "Content-Type: application/json" \
-  -d '{"username":"alice","password":"SecurePass123!","expirationMinutes":43200}'
-# Copy the token from response
-```
-
-**On BOTH PCs:**
-
-**Location:** `src/main/resources/application.properties`
-
-**Configuration:**
-```properties
-params.crypto=JWT
-params.tokenMode=manual
-params.jwtToken=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6ImExYjJj...
-params.remoteHost=company-proxy.example.com
-params.remotePort=443
+java -jar proxy.jar
+# Or: ./start-proxy.sh (Linux/macOS)
+# Or: start-proxy.bat (Windows)
 ```
 
 **Benefits:**
-- Same token on both PCs
-- No auto-renewal = no disruption
-- Update token manually every 30 days
+- ✅ Set it once, forget it
+- ✅ Token renews automatically
+- ✅ No maintenance needed
 
 ---
 
-### Scenario 3: Family Sharing (Multiple Users)
+### Scenario 2: I Use the Proxy on MULTIPLE Computers
 
-**Generate token once:**
+**Best option:** Manual mode (one token for all PCs)
+
+**Step 1: Get a token** (do this once from any computer):
+
 ```bash
-curl -k -X POST "https://family-proxy.example.com/api/auth/token/generate" \
+# Linux/macOS/Windows (PowerShell with curl installed)
+curl -k -X POST "https://proxy-server.com/api/auth/token/generate" \
   -H "Content-Type: application/json" \
-  -d '{"username":"family","password":"FamilyPass123!","expirationMinutes":43200}'
+  -d '{"username":"alice","password":"MyPassword123","expirationMinutes":43200}'
 ```
 
-**On EACH family member's PC:**
+Response looks like:
+```json
+{"success":true,"data":{"token":"eyJhbGci..."}}
+```
 
-**Location:** `src/main/resources/application.properties`
+**Copy the token** (everything after `"token":"`, before the next `"`)
 
-**Configuration:**
+**Step 2: On EACH computer**, create `application.properties`:
+
 ```properties
+# Server
+params.remoteHost=proxy-server.com
+params.remotePort=443
+
+# Manual mode (same token on all PCs)
 params.crypto=JWT
 params.tokenMode=manual
 params.jwtToken=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6ImExYjJj...
-params.remoteHost=family-proxy.example.com
-params.remotePort=443
+
+# Local ports
+params.localPort=2080
+params.httpPort=9999
 ```
 
-**Share the token with family via:**
-- Secure messaging app
-- Password manager
-- Email (encrypted)
+**Benefits:**
+- ✅ Same token on all computers
+- ✅ No conflicts between devices
+- ✅ Token valid for 30 days
+
+**Important:** Remember to update the token on all computers before it expires (30 days)!
 
 ---
 
-## Configuration Management Tips
+### Scenario 3: Family Sharing
 
-### Tip 1: Use Symbolic Links
+Same as Scenario 2, but share the token with family members.
 
-**Create a symlink to config in a standard location:**
+**Generate ONE token, give it to everyone:**
 
-```bash
-# Linux/macOS
-ln -s /etc/proxy/config.properties src/main/resources/application.properties
-
-# Now edit /etc/proxy/config.properties
-# The client will use it automatically
-```
-
-### Tip 2: Multiple Configurations
-
-**Create different configs for different scenarios:**
-
-```
-configs/
-  ├── work.properties      # Work proxy
-  ├── home.properties      # Home proxy
-  └── family.properties    # Family proxy
-```
-
-**Switch between them:**
-```bash
-# Use work config
-./gradlew bootRun --spring.config.location=configs/work.properties
-
-# Use home config
-./gradlew bootRun --spring.config.location=configs/home.properties
-```
-
-### Tip 3: Version Control
-
-**DO:**
-- ✅ Commit `config-template.properties`
-- ✅ Create `.gitignore` entry for actual config
-
-**DON'T:**
-- ❌ Commit `application.properties` with passwords
-- ❌ Commit tokens to git
-
-**.gitignore example:**
-```
-src/main/resources/application.properties
-configs/*.properties
-!config-template.properties
-```
-
-### Tip 4: Backup Your Configuration
-
-**Create a backup:**
-```bash
-# Linux/macOS
-cp src/main/resources/application.properties ~/backup/proxy-config-backup.properties
-
-# Windows
-copy src\main\resources\application.properties %USERPROFILE%\Documents\proxy-config-backup.properties
-```
-
-**Backup encryption (recommended):**
-```bash
-# Encrypt with GPG
-gpg -c src/main/resources/application.properties
-# Creates: application.properties.gpg
-
-# Decrypt when needed
-gpg -d application.properties.gpg > application.properties
-```
+1. One person generates the token (see Scenario 2)
+2. Share the token securely (Signal, password manager, etc.)
+3. Everyone creates `application.properties` with the SAME token
+4. When it expires (30 days), generate new token and share again
 
 ---
+
 
 ## Troubleshooting
 
-### Problem: Config file not found
+### Problem: "Config file not found" or "Could not find configuration"
 
-**Error:**
+**Error messages:**
 ```
 Could not resolve placeholder 'params.username'
+Configuration file not found
 ```
 
 **Solutions:**
 
-1. **Check file location:**
+1. **Make sure the file is named EXACTLY `application.properties`**
+   - Not `config.properties`
+   - Not `settings.properties`
+   - Not `Application.properties` (capital A is wrong)
+
+2. **Make sure it's in the SAME directory as proxy.jar**
    ```bash
-   ls -la src/main/resources/application.properties
+   # Linux/macOS - check if both files are together
+   ls -la ~/proxy/
+   # Should see both:
+   # proxy.jar
+   # application.properties
+
+   # Windows
+   dir C:\proxy\
+   # Should see both files
    ```
 
-2. **Verify file name:**
-   - Must be exactly `application.properties`
-   - Not `config.properties` or `settings.properties`
-
-3. **Use explicit path:**
+3. **If using custom location, specify it when running:**
    ```bash
-   ./gradlew bootRun --spring.config.location=/full/path/to/application.properties
+   java -jar proxy.jar --spring.config.location=/path/to/your/config.properties
    ```
 
-### Problem: Permission denied
+### Problem: "Permission denied"
 
 **Error:**
 ```
@@ -391,61 +467,145 @@ Cannot read configuration file: Permission denied
 
 **Linux/macOS:**
 ```bash
-chmod 600 src/main/resources/application.properties
-chown $USER src/main/resources/application.properties
+cd ~/proxy/
+chmod 644 application.properties  # Make it readable
+# Or if you want only you to read it:
+chmod 600 application.properties
 ```
 
 **Windows:**
-```cmd
-icacls application.properties /grant "%USERNAME%:F"
-```
+- Right-click file → Properties → Security
+- Make sure your user account has "Read" permission
+
+### Problem: "Proxy not connecting" or "Authentication failed"
+
+**Check your settings:**
+
+1. **Is the server address correct?**
+   ```properties
+   params.remoteHost=proxy-server.com  # Check this with your admin
+   params.remotePort=443               # Usually 443 for HTTPS
+   ```
+
+2. **Are your username/password correct?**
+   ```properties
+   params.username=alice               # Your actual username
+   params.password=YourPassword123     # Your actual password
+   ```
+
+3. **Is the mode correct?**
+   ```properties
+   params.tokenMode=auto               # For automatic mode
+   # OR
+   params.tokenMode=manual             # For manual mode
+   ```
 
 ### Problem: Special characters in password
 
-**If your password contains special characters like `!`, `$`, `@`, etc.**
+If your password has special characters (`!`, `@`, `#`, `$`, etc.), put it in quotes:
 
-**Option 1: Use environment variables**
+**Option 1: Use environment variable (recommended)**
 ```bash
-export password='MyP@ssw0rd!'  # Single quotes preserve special chars
-./gradlew bootRun
+# Linux/macOS
+export password='MyP@ssw0rd!'
+java -jar proxy.jar
+
+# Windows
+set password=MyP@ssw0rd!
+java -jar proxy.jar
 ```
 
-**Option 2: Escape in config file**
+**Option 2: Escape special characters**
 ```properties
-# Use backslash to escape
+# In application.properties, use backslash before special chars
 params.password=MyP\\@ssw0rd\\!
 ```
 
-**Option 3: Use unicode escapes**
-```properties
-params.password=MyP\u0040ssw0rd\u0021
+### Problem: "Token expired" (Manual mode)
+
+**Signs:**
+- Proxy was working, now fails
+- Error message mentions "token" or "expired"
+
+**Solution:**
+Generate a new token and update ALL your computers:
+
+```bash
+# 1. Generate new token
+curl -k -X POST "https://proxy-server.com/api/auth/token/generate" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","password":"pass","expirationMinutes":43200}'
+
+# 2. Copy the new token
+
+# 3. Update application.properties on ALL computers
+params.jwtToken=NEW_TOKEN_HERE
+
+# 4. Restart proxy on all computers
 ```
 
 ---
 
 ## Quick Reference
 
-### File Locations Summary
+### Where is my config file?
 
-| OS | Default Location |
-|----|------------------|
-| **Linux** | `~/proxy/src/main/resources/application.properties` |
-| **macOS** | `~/proxy/src/main/resources/application.properties` |
-| **Windows** | `C:\Users\YourName\proxy\src\main\resources\application.properties` |
+**Same directory as proxy.jar:**
+- Linux: `~/proxy/application.properties`
+- Windows: `C:\proxy\application.properties`
+- macOS: `~/proxy/application.properties`
 
-### Required Permissions
+### What should be in my config file?
 
-| OS | Command |
-|----|---------|
-| **Linux/macOS** | `chmod 600 application.properties` |
-| **Windows** | `icacls application.properties /inheritance:r /grant:r "%USERNAME%:F"` |
+**Automatic mode (single PC):**
+```properties
+params.crypto=JWT
+params.tokenMode=auto
+params.username=YOUR_USERNAME
+params.password=YOUR_PASSWORD
+params.remoteHost=SERVER_ADDRESS
+params.remotePort=443
+params.localPort=2080
+params.httpPort=9999
+```
 
-### Configuration Priority
+**Manual mode (multiple PCs):**
+```properties
+params.crypto=JWT
+params.tokenMode=manual
+params.jwtToken=YOUR_TOKEN_HERE
+params.remoteHost=SERVER_ADDRESS
+params.remotePort=443
+params.localPort=2080
+params.httpPort=9999
+```
 
-1. **Command line** (highest): `-Dusername=alice`
-2. **Environment variables**: `export username=alice`
-3. **External config**: `--spring.config.location=/path/to/config`
-4. **Default location** (lowest): `src/main/resources/application.properties`
+### How do I run the proxy?
+
+```bash
+# Linux/macOS
+cd ~/proxy/
+java -jar proxy.jar
+
+# Windows (double-click or PowerShell)
+cd C:\proxy
+java -jar proxy.jar
+```
+
+### How do I configure my browser?
+
+**Firefox:**
+1. Settings → General → Network Settings
+2. Manual proxy configuration
+3. SOCKS Host: `localhost`, Port: `2080`
+4. SOCKS v5: ✅
+5. OK
+
+**Chrome/Edge:**
+- Use system proxy settings or command line:
+  ```bash
+  chrome.exe --proxy-server="socks5://localhost:2080"
+  ```
 
 ---
 
