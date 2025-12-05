@@ -20,4 +20,16 @@ public class Params {
     int max = 128; // important, maximum value 256
     String secret = "password";
 
+    // JWT token for authentication (optional - only used when crypto=JWT)
+    String jwtToken = System.getProperty("jwtToken", "");
+
+    // JWT auto-acquisition settings
+    String username = System.getProperty("username", "");
+    String password = System.getProperty("password", "");
+    int tokenExpirationMinutes = Integer.parseInt(System.getProperty("tokenExpirationMinutes", "43200")); // 30 days default
+
+    // JWT auto-renewal settings
+    boolean tokenRenewalEnabled = Boolean.parseBoolean(System.getProperty("tokenRenewalEnabled", "true"));
+    int tokenRenewalIntervalMinutes = Integer.parseInt(System.getProperty("tokenRenewalIntervalMinutes", "10")); // 10 minutes default
+
 }

@@ -1,6 +1,7 @@
 package com.illiad.proxy.security;
 
 public enum Cryptos {
+    JWT("JWT"),  // JWT authentication - variable length
     SHA_224("SHA-224"),
     SHA_256("SHA-256"),
     SHA_384("SHA-384"),

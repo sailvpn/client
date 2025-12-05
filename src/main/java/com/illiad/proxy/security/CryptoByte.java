@@ -7,6 +7,8 @@ public class CryptoByte {
 
     public byte toByte(Cryptos c) {
         switch (c) {
+            case JWT:
+                return (byte) 0x07;
             case SHA_224:
                 return (byte) 0x10;
             case SHA_256:
@@ -74,6 +76,8 @@ public class CryptoByte {
 
     public Cryptos toCrypto(byte b) {
         switch (b) {
+            case (byte) 0x07:
+                return Cryptos.JWT;
             case (byte) 0x10:
                 return Cryptos.SHA_224;
             case (byte) 0x20:
@@ -141,6 +145,8 @@ public class CryptoByte {
 
     public short byteLength(Cryptos c) {
         switch (c) {
+            case JWT:
+                return 0; // JWT has variable length
             case SHA_224:
             case HMAC_SHA224:
             case SHA3_224:
