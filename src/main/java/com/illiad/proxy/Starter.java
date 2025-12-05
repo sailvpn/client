@@ -1,7 +1,8 @@
 package com.illiad.proxy;
 
+import com.illiad.proxy.codec.v5.V5InitReqDecoder;
 import com.illiad.proxy.handler.http.FrontHandler;
-import com.illiad.proxy.handler.v5.VersionHandler;
+import com.illiad.proxy.handler.v5.V5CommandHandler;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -65,8 +66,10 @@ public class Starter {
                     @Override
                     protected void initChannel(NioSocketChannel ch) {
                         ChannelPipeline pipeline = ch.pipeline();
-                        pipeline.addLast(new LoggingHandler(LogLevel.INFO),
-                                new VersionHandler(bus));
+                        pipeline.addLast(new LoggingHandler(LogLevel.INFO));
+                        pipeline.addLast(bus.namer.generateName(), bus.v5ServerEncoder);
+                        pipeline.addLast(bus.namer.generateName(), new V5InitReqDecoder());
+                        pipeline.addLast(bus.namer.generateName(), new V5CommandHandler(bus));
                     }
                 });
 
