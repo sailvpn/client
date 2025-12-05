@@ -186,6 +186,34 @@ Token will be used until expiration. Renewal must be done manually.
 
 ## 🔧 How to Use
 
+### Configuration File Location
+
+**Default location (recommended):**
+```
+src/main/resources/application.properties
+```
+
+**Full path examples:**
+- **Linux:** `/home/youruser/proxy/src/main/resources/application.properties`
+- **macOS:** `/Users/youruser/proxy/src/main/resources/application.properties`
+- **Windows:** `C:\Users\YourName\proxy\src\main\resources\application.properties`
+
+**Quick setup:**
+```bash
+# Copy the template
+cp config-template.properties src/main/resources/application.properties
+
+# Edit with your settings
+nano src/main/resources/application.properties
+
+# Secure the file (Linux/macOS)
+chmod 600 src/main/resources/application.properties
+```
+
+**See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for detailed setup instructions.**
+
+---
+
 ### Automatic Mode (Single User/Device)
 
 **Best for:** Individual use on one primary device
@@ -267,10 +295,11 @@ SOCKS5 server started on port 2080
 HTTP server started on port 9999
 ```
 
-**Token Expiration Warning:**
-- Set a reminder to manually update token before it expires (e.g., every 25 days)
-- Update `params.jwtToken` on all devices with new token
-- Restart clients on all devices
+**Important Note:**
+- The client does not parse JWT tokens, so it cannot detect or warn about token expiration
+- Track token expiration yourself based on when you generated it
+- When the token expires, requests will fail with authentication errors
+- Generate a new token, update `params.jwtToken` on all devices, and restart
 
 ---
 
