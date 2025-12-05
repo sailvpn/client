@@ -14,6 +14,11 @@ This directory contains documentation for the Illiad proxy client.
   - Step-by-step instructions
   - Troubleshooting guide
   - Security best practices
+- **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** - ⭐ Configuration file setup guide
+  - Where to place config files on PC
+  - File permissions and security
+  - Multiple configuration scenarios
+  - Environment variables vs config files
 
 ### Technical Documentation
 - **[JWT_IMPLEMENTATION.md](JWT_IMPLEMENTATION.md)** - Implementation details for developers

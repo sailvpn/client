@@ -4,6 +4,8 @@
 
 ### Step 1: Configure (30 seconds)
 
+**File location:** `src/main/resources/application.properties`
+
 Edit `src/main/resources/application.properties`:
 
 ```properties
