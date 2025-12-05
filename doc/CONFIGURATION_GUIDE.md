@@ -1,6 +1,8 @@
 # Configuration File Setup Guide for End Users
 
-This guide is for users who have **installed** the proxy client (from JAR, DEB, TAR, etc.).
+This guide is for **end users** who have installed the proxy client (from JAR, DEB, TAR, ZIP, etc.).
+
+> **👨‍💻 Are you a developer?** See [CONFIGURATION_GUIDE_DEVELOPERS.md](CONFIGURATION_GUIDE_DEVELOPERS.md) for developer-focused configuration (source code, Gradle, IDE setup, etc.)
 
 ---
 
