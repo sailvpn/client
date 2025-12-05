@@ -1,8 +1,8 @@
 package com.illiad.proxy;
 
+import com.illiad.proxy.codec.v5.V5InitReqDecoder;
 import com.illiad.proxy.codec.v5.V5ServerEncoder;
 import com.illiad.proxy.config.Params;
-import com.illiad.proxy.handler.v5.VersionHandler;
 import com.illiad.proxy.handler.v5.V5CommandHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
@@ -47,7 +47,7 @@ class StarterTest {
             throw new RuntimeException(e);
         }
 
-        verify(pipeline).addLast(any(LoggingHandler.class), any(VersionHandler.class));
+        verify(pipeline).addLast(any(LoggingHandler.class), any(V5ServerEncoder.class), any(V5InitReqDecoder.class), any(V5CommandHandler.class));
     }
 
 }
