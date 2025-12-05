@@ -118,7 +118,20 @@ params.tokenExpirationMinutes=43200
 params.tokenRenewalIntervalMinutes=10
 ```
 
-### Use Case 3: Manual Token with Auto-Renewal
+### Use Case 3: Manual Token (Shared Across Devices)
+
+**Best for:** Multiple devices, family sharing
+
+```properties
+params.crypto=JWT
+params.jwtToken=eyJhbGciOiJIUzI1NiJ9...
+# NO username/password = Manual mode (auto-renewal disabled)
+```
+
+**Benefits:**
+- One token works on all devices
+- No auto-renewal disruption
+- Perfect for family sharing
 
 ```properties
 params.crypto=JWT

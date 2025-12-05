@@ -76,11 +76,15 @@ I've successfully added **automatic JWT token acquisition and renewal** to the p
 - If auto-acquisition fails, uses manually configured `jwtToken` (if available)
 - Logs clear error messages if neither method succeeds
 
-### 2. Automatic Token Renewal
+### 2. Automatic Token Renewal (Auto Mode)
+
+**When enabled:**
+- Requires `username` and `password` to be configured
+- Client automatically acquires and renews tokens
 
 **How it works:**
 - Starts background scheduler after successful token acquisition
-- Runs every `tokenRenewalIntervalMinutes` (default: 600 = 10 minutes)
+- Runs every `tokenRenewalIntervalMinutes` (default: 10 minutes)
 - Sends HTTP POST to server: `/api/auth/token/generate`
 - Request body: `{"currentToken":"eyJ...","expirationMinutes":43200}`
 - Server responds with new token
@@ -90,6 +94,42 @@ I've successfully added **automatic JWT token acquisition and renewal** to the p
 - If renewal fails, tries to acquire new token using username/password
 - If that also fails, continues with last valid token
 - Logs all renewal attempts (success and failure)
+
+### 3. Manual Token Mode (for Token Sharing)
+
+**When to use:**
+- Sharing token across multiple devices (PC, phone, tablet)
+- Sharing token with family members
+- Token is managed externally (e.g., by a script)
+- Don't want automatic renewal
+
+**How it works:**
+- Configure only `params.jwtToken` (without username/password)
+- Client uses the provided token
+- **Auto-renewal is DISABLED** (prevents disrupting other devices)
+- Token is used until expiration
+- User manually updates token when needed
+
+**Configuration:**
+```properties
+params.crypto=JWT
+params.jwtToken=eyJhbGciOiJIUzI1NiJ9...
+# NO username/password = Manual mode
+# Auto-renewal is automatically disabled
+```
+
+**Benefits:**
+- ✅ One token works on all devices
+- ✅ No disruption when one device renews
+- ✅ Simple token sharing
+- ✅ External token management possible
+
+**Log message:**
+```
+Using manual JWT token from configuration
+Manual token mode: Auto-renewal is DISABLED to allow token sharing across devices
+Token will be used until expiration. Renewal must be done manually.
+```
 
 ### 3. Seamless Integration
 
@@ -138,7 +178,9 @@ I've successfully added **automatic JWT token acquisition and renewal** to the p
 
 ## 🔧 How to Use
 
-### Simplest Setup (3 steps)
+### Automatic Mode (Single User/Device)
+
+**Best for:** Individual use on one primary device
 
 1. **Edit** `src/main/resources/application.properties`:
    ```properties
@@ -154,13 +196,52 @@ I've successfully added **automatic JWT token acquisition and renewal** to the p
    ./gradlew bootRun
    ```
 
-3. **Configure** your browser:
-   - SOCKS5 proxy: `localhost:2080`
+**Result:**
+- ✅ Acquires token at startup
+- ✅ Renews token every 10 minutes
+- ✅ Runs indefinitely
 
-**Done!** Client will:
-- ✅ Acquire token at startup
-- ✅ Renew token every 10 minutes
-- ✅ Run indefinitely without manual intervention
+### Manual Mode (Multiple Devices/Shared Token)
+
+**Best for:**
+- Multiple devices (PC, phone, tablet)
+- Family sharing
+- External token management
+
+**Step 1: Get a token** (one time, from any device):
+```bash
+curl -k -X POST "https://your-server.com/api/auth/token/generate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username":"alice",
+    "password":"SecurePass123!",
+    "expirationMinutes":43200
+  }'
+# Response: {"success":true,"data":{"token":"eyJhbGci..."}}
+```
+
+**Step 2: Configure on ALL devices** with the same token:
+```properties
+params.crypto=JWT
+params.jwtToken=eyJhbGciOiJIUzI1NiJ9...
+# NO username/password = Manual mode
+```
+
+**Step 3: Start** on each device:
+```bash
+./gradlew bootRun
+```
+
+**Result:**
+- ✅ All devices use the same token
+- ✅ No auto-renewal (prevents disruption)
+- ✅ Token valid for 30 days
+- ✅ Manually update token before expiration
+
+**Token Expiration Warning:**
+- Set a reminder to manually update token before it expires (e.g., every 25 days)
+- Update `params.jwtToken` on all devices with new token
+- Restart clients on all devices
 
 ---
 
