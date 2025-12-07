@@ -36,11 +36,11 @@ public class HeaderEncoder {
         final short signLength = secret.getCryptoLength();
         // check if the crypto type is fixed length
         if (signLength > 0) {
-            // the encryption returns a fixed-length signature, the length field contains the whole length(length + cryptoType + signature + offset + CRLF).
+            // fixed-length signature, length field indicates the length of whole header(length + cryptoType + signature + offset + CRLF).
             // 5 = 2 bytes for length + 1 byte for crypto type + 2 bytes for CRLF
             byteBuf.writeShort((short) (signLength + offset.length + 5) & 0xFFFF);
         } else {
-            // the encryption returns a variable-length signature, the length field contain the length of the signature only(length + cryptoType + signature).
+            // variable-length signature, the length field indicates the length till the end of the signature(length + cryptoType + signature).
             // 3 = 2 bytes for length + 1 byte for crypto type
             byteBuf.writeShort((short) (secretBytes.length + 3) & 0xFFFF);
         }
