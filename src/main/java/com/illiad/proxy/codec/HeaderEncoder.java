@@ -32,10 +32,11 @@ public class HeaderEncoder {
             throw new RuntimeException(e);
         }
 
-        byte[] offset = secret.offset();
-        short signLength = secret.getCryptoLength();
+        byte[] offset = null;
+        final short signLength = secret.getCryptoLength();
         // check if the crypto type is fixed length
         if (signLength > 0) {
+            offset = secret.offset();
             // the encryption returns a fixed-length signature, the length field contains the whole length(length + cryptoType + signature + offset CRLF).
             // 5 = 2 bytes for length + 1 byte for crypto type + 2 bytes for CRLF
             byteBuf.writeShort((short) (signLength + offset.length + 5) & 0xFFFF);
@@ -47,7 +48,10 @@ public class HeaderEncoder {
         // write crypto type, signature, and offset into ByteBuffer
         byteBuf.writeByte(secret.getCryptoTypeByte());
         byteBuf.writeBytes(secretBytes);
-        byteBuf.writeBytes(offset);
+        if (signLength > 0) {
+            // only insert offset for fix-length signature
+            byteBuf.writeBytes(offset);
+        }
         byteBuf.writeBytes(CRLF);
     }
 
