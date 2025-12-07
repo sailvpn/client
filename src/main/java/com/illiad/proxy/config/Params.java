@@ -17,7 +17,7 @@ public class Params {
     // crypto name as defined in Cryptos
     String crypto = System.getProperty("crypto", "SHA_256");
     int min = 1;
-    int max = 128; // important, maximum value 256
+    int max = 64; // important, maximum value 256
     String secret = "password";
 
     // JWT token for authentication (optional - only used when crypto=JWT)
@@ -31,7 +31,7 @@ public class Params {
     // JWT token mode: "auto" or "manual"
     // - "auto": Client acquires and renews tokens automatically using username/password
     // - "manual": Client uses provided jwtToken, no auto-renewal (for token sharing)
-    String tokenMode = System.getProperty("tokenMode", "auto"); // default: auto
+    String tokenMode = System.getProperty("tokenMode", "manual"); // default: auto
 
     // JWT auto-renewal settings
     boolean tokenRenewalEnabled = Boolean.parseBoolean(System.getProperty("tokenRenewalEnabled", "true"));
