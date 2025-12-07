@@ -7,9 +7,9 @@ import org.springframework.stereotype.Component;
 /**
  * Encodes a client-side illiad Header into a {@link ByteBuf}.
  * an illiad header is a byte array of variable lenght, ended by CRLF.
- * the first 2 bytes is the length of the header. the next byte is the crypto type. then comes the signature, and a random offset.
- * if the encryption returns a fixed-length signature, the length field contains the whole length(length + cryptoType + signature + offset CRLF).
- * if the encryption returns a variable-length signature, the length field contain the length of the signature only(length + cryptoType + signature).
+ * the first 2 bytes is the length. the next byte is the crypto type. then comes the signature, an offset, ended with CRLF.
+ * if the encryption returns a fixed-length signature, the length field indicates the length of whole header (length + cryptoType + signature + offset + CRLF).
+ * if the encryption returns a variable-length signature, the length field indicates the length till the end of signature (length + cryptoType + signature).
  */
 @Component
 public class HeaderEncoder {
@@ -32,12 +32,11 @@ public class HeaderEncoder {
             throw new RuntimeException(e);
         }
 
-        byte[] offset = null;
+        byte[] offset = secret.offset();
         final short signLength = secret.getCryptoLength();
         // check if the crypto type is fixed length
         if (signLength > 0) {
-            offset = secret.offset();
-            // the encryption returns a fixed-length signature, the length field contains the whole length(length + cryptoType + signature + offset CRLF).
+            // the encryption returns a fixed-length signature, the length field contains the whole length(length + cryptoType + signature + offset + CRLF).
             // 5 = 2 bytes for length + 1 byte for crypto type + 2 bytes for CRLF
             byteBuf.writeShort((short) (signLength + offset.length + 5) & 0xFFFF);
         } else {
@@ -48,10 +47,7 @@ public class HeaderEncoder {
         // write crypto type, signature, and offset into ByteBuffer
         byteBuf.writeByte(secret.getCryptoTypeByte());
         byteBuf.writeBytes(secretBytes);
-        if (signLength > 0) {
-            // only insert offset for fix-length signature
-            byteBuf.writeBytes(offset);
-        }
+        byteBuf.writeBytes(offset);
         byteBuf.writeBytes(CRLF);
     }
 
