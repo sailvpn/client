@@ -2,22 +2,22 @@ package com.illiad.proxy.security;
 
 import com.illiad.proxy.config.Params;
 import org.springframework.stereotype.Component;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Random;
+import java.security.SecureRandom;
 
 @Component
 public class SecretImp implements Secret {
     private final Params params;
     private final CryptoByte cryptoByte;
-    private final Random random;
+    private final SecureRandom secureRandom = new SecureRandom();
     private final JwtTokenManager tokenManager;
 
     public SecretImp(Params params, CryptoByte cryptoByte, JwtTokenManager tokenManager) {
         this.params = params;
         this.cryptoByte = cryptoByte;
-        this.random = new Random();
         this.tokenManager = tokenManager;
     }
 
@@ -55,10 +55,11 @@ public class SecretImp implements Secret {
 
     @Override
     public byte[] offset() {
-        int length = random.nextInt(params.getMax() - params.getMin()) + params.getMin();
-        byte[] byteArray = new byte[length];
-        random.nextBytes(byteArray);
-        return byteArray;
+        // generate random ran bytes of length params.min..params.max
+        int offsetLen = secureRandom.nextInt(params.getMax()) + params.getMin();
+        byte[] offsetBytes = new byte[offsetLen];
+        secureRandom.nextBytes(offsetBytes);
+        return offsetBytes;
     }
 
 }
