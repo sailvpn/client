@@ -64,7 +64,7 @@ public class FrontHandler extends ChannelInboundHandlerAdapter {
                     .addListener((ChannelFutureListener) future -> {
                         if (future.isSuccess()) {
                             outbound = future.channel();
-                            SslHandler sslHandler = bus.ssl.sslCtx.newHandler(outbound.alloc(), bus.params.getRemoteHost(), bus.params.getRemotePort());
+                            SslHandler sslHandler = bus.cert.sslCtx.newHandler(outbound.alloc(), bus.params.getRemoteHost(), bus.params.getRemotePort());
                             ChannelPipeline pipeline = outbound.pipeline();
                             pipeline.addLast(sslHandler);
                             // Add a listener for the SSL handshake

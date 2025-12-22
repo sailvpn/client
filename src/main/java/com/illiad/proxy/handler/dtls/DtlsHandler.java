@@ -45,7 +45,7 @@ public class DtlsHandler extends ChannelDuplexHandler {
 
     public DtlsHandler(ParamBus bus, InetSocketAddress remoteAddress) {
         this.bus = bus;
-        this.sslEngine = bus.dtls.sslCtx.createSSLEngine(remoteAddress.getHostString(), remoteAddress.getPort());
+        this.sslEngine = bus.cert.dtlsCtx.createSSLEngine(remoteAddress.getHostString(), remoteAddress.getPort());
         this.sslEngine.setUseClientMode(true);
         this.netin = ByteBuffer.allocate(bus.utils.NET_IN_SIZE);
         this.appin = ByteBuffer.allocate(bus.utils.APP_IN_SIZE);
