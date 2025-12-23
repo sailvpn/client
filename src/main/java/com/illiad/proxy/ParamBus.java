@@ -7,6 +7,7 @@ import com.illiad.proxy.config.Params;
 import com.illiad.proxy.handler.Utils;
 import com.illiad.proxy.handler.udp.Asos;
 import com.illiad.proxy.security.Cert;
+import com.illiad.proxy.security.TokenManager;
 import com.illiad.proxy.security.Secret;
 import org.springframework.stereotype.Component;
 
@@ -21,17 +22,19 @@ public class ParamBus {
     public final V5ServerEncoder v5ServerEncoder;
     public final V5ClientEncoder v5ClientEncoder;
     public final V5AddressDecoder v5AddressDecoder;
+    public final TokenManager tokenManager;
     public final Cert cert;
     public final Secret secret;
     public final Asos asos;
     public final Utils utils;
 
-    public ParamBus(Params params, HandlerNamer namer, V5ServerEncoder v5ServerEncoder, V5ClientEncoder v5ClientEncoder, V5AddressDecoder v5AddressDecoder, Cert cert, Secret secret, Asos asos, Utils utils) {
+    public ParamBus(Params params, HandlerNamer namer, V5ServerEncoder v5ServerEncoder, V5ClientEncoder v5ClientEncoder, V5AddressDecoder v5AddressDecoder, TokenManager tokenManager, Cert cert, Secret secret, Asos asos, Utils utils) {
         this.params = params;
         this.namer = namer;
         this.v5ServerEncoder = v5ServerEncoder;
         this.v5ClientEncoder = v5ClientEncoder;
         this.v5AddressDecoder = v5AddressDecoder;
+        this.tokenManager = tokenManager;
         this.cert = cert;
         this.secret = secret;
         this.asos = asos;
