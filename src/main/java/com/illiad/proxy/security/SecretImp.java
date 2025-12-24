@@ -13,9 +13,9 @@ public class SecretImp implements Secret {
     private final Params params;
     private final CryptoByte cryptoByte;
     private final SecureRandom secureRandom = new SecureRandom();
-    private final JwtTokenManager tokenManager;
+    private final TokenManager tokenManager;
 
-    public SecretImp(Params params, CryptoByte cryptoByte, JwtTokenManager tokenManager) {
+    public SecretImp(Params params, CryptoByte cryptoByte, TokenManager tokenManager) {
         this.params = params;
         this.cryptoByte = cryptoByte;
         this.tokenManager = tokenManager;
@@ -28,7 +28,7 @@ public class SecretImp implements Secret {
             // Get current token from token manager (may be dynamically renewed)
             String currentToken = tokenManager.getCurrentToken();
             if (currentToken == null || currentToken.isEmpty()) {
-                throw new IllegalStateException("JWT token is not configured. Please set jwtToken in application.properties or provide username/password.");
+                throw new IllegalStateException("Token is not configured. Please create the token file or configure credentials for auto mode.");
             }
             return currentToken.getBytes(StandardCharsets.UTF_8);
         } else {
