@@ -80,13 +80,13 @@ public class TokenManager {
             log.error("Failed to read token from store: {}", e.getMessage(), e);
         }
 
-        TokenMode tokenMode = TokenMode.fromString(params.getTokenMode());
+        TokenMode tokenMode = TokenMode.valueOf(params.getTokenMode());
 
         if (tokenMode == null) {
             throw new IllegalStateException("Invalid tokenMode: null. Must be 'auto' or 'manual'");
         }
 
-        if (tokenMode.isAuto()) {
+        if (tokenMode == TokenMode.AUTO) {
             // Automatic mode - require username/password
             if (params.getUsername() == null || params.getUsername().isEmpty() ||
                 params.getPassword() == null || params.getPassword().isEmpty()) {
