@@ -11,20 +11,20 @@ import java.security.SecureRandom;
 @Component
 public class SecretImp implements Secret {
     private final Params params;
-    private final CryptoByte cryptoByte;
     private final SecureRandom secureRandom = new SecureRandom();
     private final TokenManager tokenManager;
 
-    public SecretImp(Params params, CryptoByte cryptoByte, TokenManager tokenManager) {
+    public SecretImp(Params params, TokenManager tokenManager) {
         this.params = params;
-        this.cryptoByte = cryptoByte;
         this.tokenManager = tokenManager;
     }
 
     @Override
     public byte[] getSecret() throws NoSuchAlgorithmException {
         // Check if crypto type is JWT
-        if (getCryptoType() == Cryptos.JWT) {
+        Cryptos cryptoType = Cryptos.valueOf(params.getCrypto());
+
+        if (cryptoType == Cryptos.JWT) {
             // Get current token from token manager (may be dynamically renewed)
             String currentToken = tokenManager.getCurrentToken();
             if (currentToken == null || currentToken.isEmpty()) {
@@ -33,7 +33,7 @@ public class SecretImp implements Secret {
             return currentToken.getBytes(StandardCharsets.UTF_8);
         } else {
             // Hash-based authentication
-            MessageDigest digest = MessageDigest.getInstance(Cryptos.valueOf(params.getCrypto()).getValue());
+            MessageDigest digest = MessageDigest.getInstance(cryptoType.getValue());
             return digest.digest(params.getSecret().getBytes(StandardCharsets.UTF_8));
         }
     }
@@ -45,12 +45,12 @@ public class SecretImp implements Secret {
 
     @Override
     public byte getCryptoTypeByte() {
-        return this.cryptoByte.toByte(Cryptos.valueOf(params.getCrypto()));
+        return Cryptos.valueOf(params.getCrypto()).getCode();
     }
 
     @Override
     public short getCryptoLength() {
-        return this.cryptoByte.byteLength(Cryptos.valueOf(params.getCrypto()));
+        return Cryptos.valueOf(params.getCrypto()).getLength();
     }
 
     @Override
