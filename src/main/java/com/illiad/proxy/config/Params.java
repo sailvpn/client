@@ -17,22 +17,25 @@ public class Params {
     // crypto name as defined in Cryptos
     String crypto = System.getProperty("crypto", "SHA_256");
     int min = 1;
-    int max = 64; // important, maximum value 256
+    int max = 64; // important, maximum value 128
     String secret = "password";
 
-    // JWT token for authentication (optional - only used when crypto=JWT)
-    String jwtToken = System.getProperty("jwtToken", "");
+    // NOTE: in-memory jwtToken removed to avoid embedding secrets in configuration objects.
+    // The client must use a TokenStore implementation (e.g. FileTokenStore) to load/save tokens
+    // from a file on disk. This path can be configured via params.jwtTokenFile, system property
+    // -DjwtTokenFile=... or environment variable JWT_TOKEN_FILE.
+
+    // JWT token file path: can be set via application.properties (params.jwtTokenFile)
+    // or overridden via JVM system property -DjwtTokenFile=... or environment JWT_TOKEN_FILE
+    String jwtTokenFile = System.getProperty("jwtTokenFile", System.getenv("JWT_TOKEN_FILE") != null ? System.getenv("JWT_TOKEN_FILE") : "./token.jwt");
 
     // JWT auto-acquisition settings
     String username = System.getProperty("username", "");
     String password = System.getProperty("password", "");
     int tokenExpirationMinutes = Integer.parseInt(System.getProperty("tokenExpirationMinutes", "43200")); // 30 days default
 
-    // JWT token mode: "auto" or "manual"
-    // - "auto": Client acquires and renews tokens automatically using username/password
-    // - "manual": Client uses provided jwtToken, no auto-renewal (for token sharing)
-    String tokenMode = System.getProperty("tokenMode", "manual"); // default: auto
-
+    // JWT token mode: use TokenMode enum instead of raw string
+    String tokenMode = System.getProperty("tokenMode", "manual"); // kept as raw property for Spring binding/backwards compatibility
     // JWT auto-renewal settings
     boolean tokenRenewalEnabled = Boolean.parseBoolean(System.getProperty("tokenRenewalEnabled", "true"));
     int tokenRenewalIntervalMinutes = Integer.parseInt(System.getProperty("tokenRenewalIntervalMinutes", "10")); // 10 minutes default
