@@ -293,17 +293,6 @@ $env:remotePort="443"
 .\gradlew.bat bootRun
 ```
 
-### Windows CMD
-
-```cmd
-set crypto=JWT
-set username=alice
-set password=SecurePass123!
-set remoteHost=proxy.example.com
-set remotePort=443
-gradlew.bat bootRun
-```
-
 ---
 
 ## Browser Configuration
@@ -446,12 +435,10 @@ HTTP server started on port 9999
 
 ## Quick Links
 
-- **Full Guide:** [JWT_AUTO_MANAGEMENT.md](JWT_AUTO_MANAGEMENT.md)
-- **Manual Setup:** [JWT_SETUP.md](JWT_SETUP.md)
-- **Architecture:** [CLIENT_ARCHITECTURE.md](CLIENT_ARCHITECTURE.md)
-- **Implementation:** [JWT_IMPLEMENTATION.md](JWT_IMPLEMENTATION.md)
+- **Full Guide:** [TOKEN_AUTO_MANAGEMENT.md](TOKEN_AUTO_MANAGEMENT.md)
+- **Manual Setup:** [TOKEN_SETUP.md](TOKEN_SETUP.md)
+- **Implementation:** [TOKEN_IMPLEMENTATION.md](TOKEN_IMPLEMENTATION.md)
 
 ---
 
 **Last Updated:** December 5, 2025
-

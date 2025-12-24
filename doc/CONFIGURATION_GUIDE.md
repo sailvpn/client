@@ -613,8 +613,8 @@ java -jar proxy.jar
 
 ## See Also
 
-- **[JWT_QUICK_REFERENCE.md](JWT_QUICK_REFERENCE.md)** - Quick setup guide
-- **[JWT_AUTO_MANAGEMENT.md](JWT_AUTO_MANAGEMENT.md)** - Complete user guide
+- **[TOKEN_QUICK_REFERENCE.md](TOKEN_QUICK_REFERENCE.md)** - Quick setup guide
+- **[TOKEN_AUTO_MANAGEMENT.md](TOKEN_AUTO_MANAGEMENT.md)** - Complete user guide
 - **[config-template.properties](../config-template.properties)** - Configuration template
 
 ---
@@ -622,4 +622,3 @@ java -jar proxy.jar
 **Last Updated:** December 5, 2025  
 **Applies to:** PC (Windows, Linux, macOS)  
 **Note:** Mobile devices (phones, tablets) are not covered - they may use different apps
-

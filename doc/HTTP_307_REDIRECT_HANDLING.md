@@ -10,7 +10,7 @@ The JWT token management system now properly handles **HTTP 307 (Temporary Redir
 
 ### Location
 
-**File:** `src/main/java/com/illiad/proxy/security/JwtTokenManager.java`
+**File:** `src/main/java/com/illiad/proxy/security/TokenManager.java`
 
 **Method:** `sendHttpPost(String urlString, String jsonBody, int redirectCount)`
 
@@ -361,12 +361,12 @@ All documentation has been updated to include HTTP 307 redirect handling:
    - Added redirect handling to features list
    - Added to network security section
 
-2. **JWT_AUTO_MANAGEMENT.md**
+2. **TOKEN_AUTO_MANAGEMENT.md**
    - Added "Server Communication" section explaining redirects
    - Added troubleshooting entry for redirect loops
    - Documented redirect behavior and limits
 
-3. **JWT_QUICK_REFERENCE.md**
+3. **TOKEN_QUICK_REFERENCE.md**
    - Added "Too many redirects" troubleshooting entry
 
 4. **RELEASE_NOTES.md**
@@ -404,7 +404,7 @@ All documentation has been updated to include HTTP 307 redirect handling:
 
 ### What Was Implemented
 
-✅ **HTTP 307/308 redirect handling** in `JwtTokenManager.java`
+✅ **HTTP 307/308 redirect handling** in `TokenManager.java`
 ✅ **Loop prevention** (max 5 redirects)
 ✅ **Relative URL resolution** (absolute and relative paths)
 ✅ **Debug logging** (logs each redirect)
@@ -433,4 +433,3 @@ All documentation has been updated to include HTTP 307 redirect handling:
 **HTTP Status Codes Supported:** 307, 308  
 **Max Redirects:** 5  
 **Production Ready:** ✅ Yes
-

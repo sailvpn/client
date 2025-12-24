@@ -36,7 +36,7 @@ Successfully implemented **automatic JWT token acquisition and renewal** with **
 
 ### New Files Created (8 files)
 
-1. **`JwtTokenManager.java`** (370 lines)
+1. **`TokenManager.java`** (370 lines)
    - Core token management service
    - HTTP client with redirect handling
    - Background renewal scheduler
@@ -46,11 +46,11 @@ Successfully implemented **automatic JWT token acquisition and renewal** with **
    - Complete example configuration
    - Comments explaining all settings
 
-3. **`doc/JWT_AUTO_MANAGEMENT.md`** (800+ lines)
+3. **`doc/TOKEN_AUTO_MANAGEMENT.md`** (800+ lines)
    - Complete user guide
    - How it works, configuration, troubleshooting
 
-4. **`doc/JWT_QUICK_REFERENCE.md`** (400+ lines)
+4. **`doc/TOKEN_QUICK_REFERENCE.md`** (400+ lines)
    - One-page quick start
    - Configuration cheat sheet
 
@@ -76,7 +76,7 @@ Successfully implemented **automatic JWT token acquisition and renewal** with **
    - `username`, `password`, `tokenExpirationMinutes`, `tokenRenewalEnabled`, `tokenRenewalIntervalMinutes`
 
 2. **`SecretImp.java`**
-   - Injected `JwtTokenManager` dependency
+   - Injected `TokenManager` dependency
    - Now calls `tokenManager.getCurrentToken()`
 
 3. **`Starter.java`**
@@ -234,7 +234,7 @@ Credentials never logged
 
 ### Code Statistics
 
-- **New Java code:** 370 lines (`JwtTokenManager.java`)
+- **New Java code:** 370 lines (`TokenManager.java`)
 - **Modified Java code:** 30 lines (`Params.java`, `SecretImp.java`, `Starter.java`)
 - **Documentation:** 3,000+ lines across 7 documents
 - **Total implementation:** ~3,400 lines
@@ -258,21 +258,21 @@ Credentials never logged
 ## 🎓 Documentation Guide
 
 ### For First-Time Users
-1. **[JWT_QUICK_REFERENCE.md](JWT_QUICK_REFERENCE.md)** - 30-second setup
-2. **[JWT_AUTO_MANAGEMENT.md](JWT_AUTO_MANAGEMENT.md)** - Complete guide
+1. **[TOKEN_QUICK_REFERENCE.md](TOKEN_QUICK_REFERENCE.md)** - 30-second setup
+2. **[TOKEN_AUTO_MANAGEMENT.md](TOKEN_AUTO_MANAGEMENT.md)** - Complete guide
 
 ### For Advanced Configuration
-1. **[JWT_AUTO_MANAGEMENT.md](JWT_AUTO_MANAGEMENT.md)** - Advanced configurations section
+1. **[TOKEN_AUTO_MANAGEMENT.md](TOKEN_AUTO_MANAGEMENT.md)** - Advanced configurations section
 2. **[application.properties.jwt.example](../application.properties.jwt.example)** - Example config
 
 ### For Troubleshooting
-1. **[JWT_AUTO_MANAGEMENT.md](JWT_AUTO_MANAGEMENT.md)** - Troubleshooting section
-2. **[JWT_QUICK_REFERENCE.md](JWT_QUICK_REFERENCE.md)** - Quick fixes
+1. **[TOKEN_AUTO_MANAGEMENT.md](TOKEN_AUTO_MANAGEMENT.md)** - Troubleshooting section
+2. **[TOKEN_QUICK_REFERENCE.md](TOKEN_QUICK_REFERENCE.md)** - Quick fixes
 
 ### For Developers
 1. **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Implementation details
 2. **[HTTP_307_REDIRECT_HANDLING.md](HTTP_307_REDIRECT_HANDLING.md)** - Redirect handling
-3. **[JWT_IMPLEMENTATION.md](JWT_IMPLEMENTATION.md)** - Technical specs
+3. **[TOKEN_IMPLEMENTATION.md](TOKEN_IMPLEMENTATION.md)** - Technical specs
 
 ### For System Administrators
 1. **[RELEASE_NOTES.md](RELEASE_NOTES.md)** - What changed, how to upgrade
@@ -352,7 +352,7 @@ Credentials never logged
 ## 📦 Deliverables Checklist
 
 ### Code
-- ✅ JwtTokenManager.java (370 lines)
+- ✅ TokenManager.java (370 lines)
 - ✅ Updated Params.java (5 new fields)
 - ✅ Updated SecretImp.java (token manager integration)
 - ✅ Updated Starter.java (initialization/shutdown)
@@ -360,8 +360,8 @@ Credentials never logged
 - ✅ Example configuration file
 
 ### Documentation
-- ✅ JWT_AUTO_MANAGEMENT.md (800+ lines)
-- ✅ JWT_QUICK_REFERENCE.md (400+ lines)
+- ✅ TOKEN_AUTO_MANAGEMENT.md (800+ lines)
+- ✅ TOKEN_QUICK_REFERENCE.md (400+ lines)
 - ✅ IMPLEMENTATION_SUMMARY.md (480+ lines)
 - ✅ RELEASE_NOTES.md (450+ lines)
 - ✅ HTTP_307_REDIRECT_HANDLING.md (430+ lines)
@@ -396,15 +396,15 @@ Credentials never logged
 ## 📞 Support & Resources
 
 ### Quick Help
-- **30-second setup:** See [JWT_QUICK_REFERENCE.md](JWT_QUICK_REFERENCE.md)
-- **Troubleshooting:** See "Troubleshooting Quick Fixes" in [JWT_QUICK_REFERENCE.md](JWT_QUICK_REFERENCE.md)
+- **30-second setup:** See [TOKEN_QUICK_REFERENCE.md](TOKEN_QUICK_REFERENCE.md)
+- **Troubleshooting:** See "Troubleshooting Quick Fixes" in [TOKEN_QUICK_REFERENCE.md](TOKEN_QUICK_REFERENCE.md)
 
 ### Detailed Help
-- **Complete guide:** See [JWT_AUTO_MANAGEMENT.md](JWT_AUTO_MANAGEMENT.md)
-- **FAQ:** See "FAQ" section in [JWT_AUTO_MANAGEMENT.md](JWT_AUTO_MANAGEMENT.md)
+- **Complete guide:** See [TOKEN_AUTO_MANAGEMENT.md](TOKEN_AUTO_MANAGEMENT.md)
+- **FAQ:** See "FAQ" section in [TOKEN_AUTO_MANAGEMENT.md](TOKEN_AUTO_MANAGEMENT.md)
 
 ### Technical Details
-- **Implementation:** See [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)
+- **Implementation:** See [TOKEN_IMPLEMENTATION.md](TOKEN_IMPLEMENTATION.md)
 - **Redirects:** See [HTTP_307_REDIRECT_HANDLING.md](HTTP_307_REDIRECT_HANDLING.md)
 - **Release notes:** See [RELEASE_NOTES.md](RELEASE_NOTES.md)
 
@@ -473,4 +473,3 @@ This implementation:
 ## Thank You!
 
 The automatic JWT token management system with HTTP 307 redirect support is now **complete, tested, documented, and ready for production use**. Users can enjoy hassle-free proxy access with automatic token handling! 🎉
-
