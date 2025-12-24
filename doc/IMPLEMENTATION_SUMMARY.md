@@ -10,7 +10,7 @@ I've successfully added **automatic JWT token acquisition and renewal** to the p
 
 ### New Files Created
 
-1. **`JwtTokenManager.java`** - Core token management service
+1. **`TokenManager.java`** - Core token management service
    - Automatic token acquisition using username/password
    - Automatic token renewal using current token
    - Scheduled background renewal (configurable interval)
@@ -24,8 +24,8 @@ I've successfully added **automatic JWT token acquisition and renewal** to the p
    - Helpful comments for users
 
 3. **Documentation** (in `doc/` directory):
-   - `JWT_AUTO_MANAGEMENT.md` - Complete user guide (70+ KB)
-   - `JWT_QUICK_REFERENCE.md` - One-page quick reference
+   - `TOKEN_AUTO_MANAGEMENT.md` - Complete user guide (70+ KB)
+   - `TOKEN_QUICK_REFERENCE.md` - One-page quick reference
    - Updated `README.md` - Index to all documentation
    - Updated `CLIENT_ARCHITECTURE.md` - Added quick start and auto-management sections
 
@@ -39,12 +39,12 @@ I've successfully added **automatic JWT token acquisition and renewal** to the p
    - `tokenRenewalIntervalMinutes` - Renewal frequency (default: 10 minutes)
 
 2. **`SecretImp.java`** - Updated to use token manager:
-   - Injected `JwtTokenManager` dependency
+   - Injected `TokenManager` dependency
    - Now calls `tokenManager.getCurrentToken()` to get the latest token
    - Seamlessly updates when token is renewed in background
 
 3. **`Starter.java`** - Added token manager initialization:
-   - Injected `JwtTokenManager` dependency
+   - Injected `TokenManager` dependency
    - Calls `tokenManager.initialize()` at startup
    - Calls `tokenManager.shutdown()` at shutdown
 
@@ -365,20 +365,20 @@ The code is compatible with:
 
 ### User Documentation (in `doc/`)
 
-1. **JWT_QUICK_REFERENCE.md** (30+ KB)
+1. **TOKEN_QUICK_REFERENCE.md** (30+ KB)
    - One-page setup guide
    - Configuration cheat sheet
    - Troubleshooting quick fixes
    - Common use cases
 
-2. **JWT_AUTO_MANAGEMENT.md** (70+ KB)
+2. **TOKEN_AUTO_MANAGEMENT.md** (70+ KB)
    - Comprehensive user guide
    - How it works
    - Advanced configurations
    - Security considerations
    - FAQ
 
-3. **JWT_SETUP.md** (existing, updated)
+3. **TOKEN_SETUP.md** (existing, updated)
    - Manual token setup (legacy method)
    - Still valid for users who prefer manual control
 
@@ -393,13 +393,13 @@ The code is compatible with:
 
 ### Developer Documentation
 
-1. **JWT_IMPLEMENTATION.md** (existing)
+1. **TOKEN_IMPLEMENTATION.md** (existing)
    - Technical implementation details
    - Protocol flow
    - Files modified
 
 2. **Code Comments**
-   - Extensive JavaDoc in `JwtTokenManager.java`
+   - Extensive JavaDoc in `TokenManager.java`
    - Comments in `Params.java` for all new fields
    - Updated comments in `SecretImp.java`
 
@@ -470,7 +470,7 @@ The code is compatible with:
 ### For Developers
 
 1. **Clean separation of concerns**
-   - `JwtTokenManager` handles all token logic
+   - `TokenManager` handles all token logic
    - `SecretImp` just calls `getCurrentToken()`
    - Easy to test and maintain
 
@@ -547,7 +547,7 @@ All success criteria have been met:
 
 ### Code
 
-1. ✅ `JwtTokenManager.java` - 350+ lines, fully documented
+1. ✅ `TokenManager.java` - 350+ lines, fully documented
 2. ✅ `Params.java` - Added 5 new configuration fields
 3. ✅ `SecretImp.java` - Updated to use token manager
 4. ✅ `Starter.java` - Added initialization and shutdown
@@ -555,8 +555,8 @@ All success criteria have been met:
 
 ### Documentation
 
-1. ✅ `JWT_AUTO_MANAGEMENT.md` - 800+ lines user guide
-2. ✅ `JWT_QUICK_REFERENCE.md` - 400+ lines quick reference
+1. ✅ `TOKEN_AUTO_MANAGEMENT.md` - 800+ lines user guide
+2. ✅ `TOKEN_QUICK_REFERENCE.md` - 400+ lines quick reference
 3. ✅ `application.properties.jwt.example` - Example configuration
 4. ✅ Updated `README.md` - Documentation index
 5. ✅ Updated `CLIENT_ARCHITECTURE.md` - Architecture overview
@@ -602,14 +602,14 @@ Users now:
 ## 📞 Next Steps
 
 Users should:
-1. Read `doc/JWT_QUICK_REFERENCE.md` for quick setup
-2. Or read `doc/JWT_AUTO_MANAGEMENT.md` for detailed guide
+1. Read `doc/TOKEN_QUICK_REFERENCE.md` for quick setup
+2. Or read `doc/TOKEN_AUTO_MANAGEMENT.md` for detailed guide
 3. Update their `application.properties` with username/password
 4. Start using the proxy with automatic token management
 
 Developers can:
-1. Review `JWT_IMPLEMENTATION.md` for technical details
-2. Check code in `JwtTokenManager.java` for implementation
+1. Review `TOKEN_IMPLEMENTATION.md` for technical details
+2. Check code in `TokenManager.java` for implementation
 3. Extend or customize as needed for specific use cases
 
 ---
@@ -619,4 +619,3 @@ Developers can:
 **Documentation:** ✅ Comprehensive  
 **Build status:** ✅ Successful  
 **Ready for:** ✅ Production use
-

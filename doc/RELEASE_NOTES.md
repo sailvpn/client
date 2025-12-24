@@ -101,7 +101,7 @@ The default 10-minute renewal interval is optimized for typical proxy usage:
 
 ### For Developers
 
-✅ **Clean architecture** - Separate `JwtTokenManager` component  
+✅ **Clean architecture** - Separate `TokenManager` component  
 ✅ **Well-documented** - Comprehensive user and developer docs  
 ✅ **Backward compatible** - Manual token config still works  
 ✅ **Extensible** - Easy to customize renewal logic  
@@ -218,7 +218,7 @@ That's it! No code changes required.
 
 ## Technical Details
 
-### New Component: JwtTokenManager
+### New Component: TokenManager
 
 A new Spring component handles all token operations:
 
@@ -231,7 +231,7 @@ A new Spring component handles all token operations:
 ### Integration Points
 
 1. **Params.java** - Added 5 new configuration fields
-2. **SecretImp.java** - Uses `JwtTokenManager.getCurrentToken()`
+2. **SecretImp.java** - Uses `TokenManager.getCurrentToken()`
 3. **Starter.java** - Initializes token manager at startup
 
 ### Server Communication
@@ -275,9 +275,9 @@ The client automatically handles HTTP 307/308 redirects:
 
 ### User Guides
 
-- **[JWT_QUICK_REFERENCE.md](JWT_QUICK_REFERENCE.md)** - One-page quick start
-- **[JWT_AUTO_MANAGEMENT.md](JWT_AUTO_MANAGEMENT.md)** - Complete user guide
-- **[JWT_SETUP.md](JWT_SETUP.md)** - Manual setup (legacy)
+- **[TOKEN_QUICK_REFERENCE.md](TOKEN_QUICK_REFERENCE.md)** - One-page quick start
+- **[TOKEN_AUTO_MANAGEMENT.md](TOKEN_AUTO_MANAGEMENT.md)** - Complete user guide
+- **[TOKEN_IMPLEMENTATION.md](TOKEN_IMPLEMENTATION.md)** - Implementation details
 
 ### Technical Docs
 
@@ -421,16 +421,16 @@ Testing by: AI Assistant
 #### Added
 - Automatic JWT token acquisition using username/password
 - Automatic JWT token renewal with configurable interval (default: 10 minutes)
-- `JwtTokenManager` component for token lifecycle management
+- `TokenManager` component for token lifecycle management
 - Configuration fields: `username`, `password`, `tokenExpirationMinutes`, `tokenRenewalEnabled`, `tokenRenewalIntervalMinutes`
-- HTTP 307/308 redirect handling with loop prevention (max 5 redirects)
+- HTTP 307/308 redirect handling with loop prevention (prevents loops)
 - Comprehensive user documentation (3 guides, 1500+ lines)
 - Example configuration file
 - Integration with existing `SecretImp` and `Starter` components
 
 #### Changed
-- `SecretImp` now uses `JwtTokenManager.getCurrentToken()`
-- `Starter` now initializes and shuts down `JwtTokenManager`
+- `SecretImp` now uses `TokenManager.getCurrentToken()`
+- `Starter` now initializes and shuts down `TokenManager`
 - `application.properties` updated with new configuration examples
 
 #### Fixed
@@ -473,15 +473,15 @@ Testing by: AI Assistant
 
 ### For New Users
 
-Follow the [Quick Start Guide](JWT_QUICK_REFERENCE.md).
+Follow the [Quick Start Guide](TOKEN_QUICK_REFERENCE.md).
 
 ---
 
 ## Support
 
 ### Documentation
-- Quick start: [JWT_QUICK_REFERENCE.md](JWT_QUICK_REFERENCE.md)
-- Full guide: [JWT_AUTO_MANAGEMENT.md](JWT_AUTO_MANAGEMENT.md)
+- Quick start: [TOKEN_QUICK_REFERENCE.md](TOKEN_QUICK_REFERENCE.md)
+- Full guide: [TOKEN_AUTO_MANAGEMENT.md](TOKEN_AUTO_MANAGEMENT.md)
 - Architecture: [CLIENT_ARCHITECTURE.md](CLIENT_ARCHITECTURE.md)
 
 ### Getting Help
@@ -502,4 +502,3 @@ Same as project license (see [LICENSE](../LICENSE))
 **Tested:** ✅ Yes  
 **Documented:** ✅ Yes  
 **Backward Compatible:** ✅ Yes
-

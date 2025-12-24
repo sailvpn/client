@@ -67,69 +67,6 @@ JWT (JSON Web Token) authentication support has been added to the proxy client, 
    - Looks up user in database
    - Grants/denies access
 
-### Key Design Decisions
-
-1. **No JWT Library Needed:** Client just sends the token string as bytes - no parsing or validation required
-2. **Backward Compatible:** Existing hash-based authentication continues to work
-3. **Variable Length Support:** Reuses existing variable-length header logic (when `byteLength()` returns 0)
-4. **Configuration Flexibility:** Supports application.properties, system properties, and environment variables
-
-## Usage Examples
-
-### Using JWT Authentication
-
-```bash
-# Set via system properties
-./gradlew bootRun -Dcrypto=JWT -DjwtToken="eyJhbGciOiJIUzI1NiJ9..."
-
-# Or set in application.properties
-params.crypto=JWT
-params.jwtToken=eyJhbGciOiJIUzI1NiJ9.eyJpZCI6ImExYjJjM2Q0...
-```
-
-### Using Hash-Based Authentication (Original)
-
-```bash
-# Set via system properties
-./gradlew bootRun -Dcrypto=SHA_256
-
-# Or set in application.properties
-params.crypto=SHA_256
-params.secret=your-shared-secret
-```
-
-## Testing the Implementation
-
-1. **Compile the code:**
-   ```bash
-   ./gradlew compileJava
-   ```
-   ✅ Verified: Builds successfully with no errors
-
-2. **Test JWT authentication:**
-   ```bash
-   # Configure with your JWT token
-   params.crypto=JWT
-   params.jwtToken=your-token-here
-   
-   # Start the proxy
-   ./gradlew bootRun
-   
-   # Should connect to remote server with JWT authentication
-   ```
-
-3. **Test hash authentication (regression test):**
-   ```bash
-   # Use existing hash-based config
-   params.crypto=SHA_256
-   params.secret=password
-   
-   # Start the proxy
-   ./gradlew bootRun
-   
-   # Should work as before
-   ```
-
 ## Security Considerations
 
 ✅ **Token Encryption:** JWT tokens are sent over TLS, so they're encrypted in transit  
@@ -164,7 +101,7 @@ Potential improvements for future versions:
 ## Documentation
 
 For users:
-- Read `JWT_SETUP.md` for setup instructions
+- Read `TOKEN_SETUP.md` for setup instructions
 - See `application.properties.jwt.example` for configuration examples
 - Refer to server documentation for token generation
 
@@ -176,7 +113,7 @@ For developers:
 ## Support
 
 If you encounter issues:
-1. Check `JWT_SETUP.md` troubleshooting section
+1. Check `TOKEN_SETUP.md` troubleshooting section
 2. Verify token format and expiration at https://jwt.io
 3. Check server logs for authentication errors
 4. Ensure server supports JWT authentication (crypto type 0x07)

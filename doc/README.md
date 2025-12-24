@@ -5,11 +5,11 @@ This directory contains documentation for the Illiad proxy client.
 ## JWT Authentication Documentation
 
 ### Quick Start
-- **[JWT_QUICK_REFERENCE.md](JWT_QUICK_REFERENCE.md)** - One-page quick reference with essential commands and configuration
-- **[JWT_AUTO_MANAGEMENT.md](JWT_AUTO_MANAGEMENT.md)** - ⭐ **NEW!** Automatic token acquisition and renewal guide
+- **[TOKEN_QUICK_REFERENCE.md](TOKEN_QUICK_REFERENCE.md)** - One-page quick reference with essential commands and configuration
+- **[TOKEN_AUTO_MANAGEMENT.md](TOKEN_AUTO_MANAGEMENT.md)** - ⭐ **NEW!** Automatic token acquisition and renewal guide
 
 ### User Guides
-- **[JWT_SETUP.md](JWT_SETUP.md)** - Manual JWT setup guide (legacy method)
+- **[TOKEN_SETUP.md](TOKEN_SETUP.md)** - Manual token setup guide (legacy method)
   - Configuration options
   - Step-by-step instructions
   - Troubleshooting guide
@@ -31,7 +31,7 @@ This directory contains documentation for the Illiad proxy client.
   - Testing configurations
 
 ### Technical Documentation
-- **[JWT_IMPLEMENTATION.md](JWT_IMPLEMENTATION.md)** - Implementation details for developers
+- **[TOKEN_IMPLEMENTATION.md](TOKEN_IMPLEMENTATION.md)** - Implementation details for developers
   - Files modified
   - Architecture overview
   - Protocol flow
@@ -42,12 +42,12 @@ This directory contains documentation for the Illiad proxy client.
 ## Quick Links
 
 ### For First-Time Users (Recommended Path)
-1. Read **[JWT_QUICK_REFERENCE.md](JWT_QUICK_REFERENCE.md)** for a 30-second setup
-2. Or read **[JWT_AUTO_MANAGEMENT.md](JWT_AUTO_MANAGEMENT.md)** for detailed automatic setup
-3. Alternative: [JWT_SETUP.md](JWT_SETUP.md) for manual token management (legacy)
+1. Read **[TOKEN_QUICK_REFERENCE.md](TOKEN_QUICK_REFERENCE.md)** for a 30-second setup
+2. Or read **[TOKEN_AUTO_MANAGEMENT.md](TOKEN_AUTO_MANAGEMENT.md)** for detailed automatic setup
+3. Alternative: [TOKEN_SETUP.md](TOKEN_SETUP.md) for manual token management (legacy)
 
 ### For Developers
-1. Check [JWT_IMPLEMENTATION.md](JWT_IMPLEMENTATION.md) for implementation details
+1. Check [TOKEN_IMPLEMENTATION.md](TOKEN_IMPLEMENTATION.md) for implementation details
 2. Review [CLIENT_ARCHITECTURE.md](CLIENT_ARCHITECTURE.md) for overall architecture
 3. Review code changes in the modified files listed in the implementation doc
 
@@ -121,4 +121,3 @@ For server-side documentation, see the server project's `doc` directory:
 ---
 
 Last updated: December 5, 2025
-

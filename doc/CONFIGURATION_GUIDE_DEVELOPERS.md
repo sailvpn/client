@@ -680,7 +680,7 @@ void validateConfiguration() {
 
 ### At Runtime
 
-**Add validation in JwtTokenManager:**
+**Add validation in TokenManager:**
 ```java
 @PostConstruct
 public void validate() {
@@ -704,7 +704,7 @@ public void validate() {
 
 - **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** - End-user configuration guide
 - **[JWT_AUTO_MANAGEMENT.md](JWT_AUTO_MANAGEMENT.md)** - JWT feature documentation
-- **[JWT_IMPLEMENTATION.md](JWT_IMPLEMENTATION.md)** - Technical implementation details
+- **[TOKEN_IMPLEMENTATION.md](TOKEN_IMPLEMENTATION.md)** - Technical implementation details
 
 ---
 
