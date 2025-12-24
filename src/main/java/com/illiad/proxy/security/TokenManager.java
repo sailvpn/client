@@ -1,7 +1,12 @@
 package com.illiad.proxy.security;
 
 import com.illiad.proxy.config.Params;
+import com.illiad.proxy.config.TokenMode;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -15,18 +20,44 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * JWT Token Manager
+ * Token Manager
  * Handles automatic token acquisition and renewal for the proxy client
  */
 @Component
-public class JwtTokenManager {
+public class TokenManager {
+    private static final Logger log = LoggerFactory.getLogger(TokenManager.class);
     private final Params params;
     private final AtomicReference<String> currentToken = new AtomicReference<>();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private volatile boolean running = false;
+    private final TokenStore tokenStore;
 
-    public JwtTokenManager(Params params) {
+    @Autowired
+    public TokenManager(Params params) {
         this.params = params;
+        // Determine path priority: Params (application.properties) > env JWT_TOKEN_FILE > system property jwtTokenFile > default
+        String configured = params.getJwtTokenFile();
+        if (configured != null && !configured.isEmpty()) {
+            this.tokenStore = new FileTokenStore(configured);
+        } else {
+            String env = System.getenv("JWT_TOKEN_FILE");
+            if (env != null && !env.isEmpty()) {
+                this.tokenStore = new FileTokenStore(env);
+            } else {
+                String prop = System.getProperty("jwtTokenFile");
+                if (prop != null && !prop.isEmpty()) {
+                    this.tokenStore = new FileTokenStore(prop);
+                } else {
+                    this.tokenStore = new FileTokenStore("./token.jwt");
+                }
+            }
+        }
+    }
+
+    // For tests or explicit wiring (package-private)
+    TokenManager(Params params, TokenStore store) {
+        this.params = params;
+        this.tokenStore = store;
     }
 
     /**
@@ -34,18 +65,28 @@ public class JwtTokenManager {
      */
     public void initialize() {
         if (!params.getCrypto().equals("JWT")) {
-            System.out.println("JWT token management disabled (crypto != JWT)");
+            log.info("Token management disabled (crypto != JWT)");
             return;
         }
 
-        String tokenMode = params.getTokenMode().toLowerCase();
-
-        // Validate token mode
-        if (!tokenMode.equals("auto") && !tokenMode.equals("manual")) {
-            throw new IllegalStateException("Invalid tokenMode: " + tokenMode + ". Must be 'auto' or 'manual'");
+        // Attempt to read existing token from TokenStore (if any)
+        try {
+            String stored = tokenStore != null ? tokenStore.readToken() : null;
+            if (stored != null && !stored.isEmpty()) {
+                currentToken.set(stored);
+                log.info("Loaded token from token store");
+            }
+        } catch (TokenStorageException e) {
+            log.error("Failed to read token from store: {}", e.getMessage(), e);
         }
 
-        if (tokenMode.equals("auto")) {
+        TokenMode tokenMode = TokenMode.fromString(params.getTokenMode());
+
+        if (tokenMode == null) {
+            throw new IllegalStateException("Invalid tokenMode: null. Must be 'auto' or 'manual'");
+        }
+
+        if (tokenMode.isAuto()) {
             // Automatic mode - require username/password
             if (params.getUsername() == null || params.getUsername().isEmpty() ||
                 params.getPassword() == null || params.getPassword().isEmpty()) {
@@ -55,57 +96,70 @@ public class JwtTokenManager {
                 );
             }
 
-            System.out.println("Automatic token mode enabled (tokenMode=auto)");
-            System.out.println("Auto-acquiring JWT token for user: " + params.getUsername());
-            
+            log.info("Automatic token mode enabled (tokenMode=auto)");
+            log.info("Auto-acquiring token for user: {}", params.getUsername());
+
             // Acquire initial token
             if (acquireToken()) {
-                System.out.println("Successfully acquired JWT token");
-                
+                log.info("Successfully acquired token");
+
+                // Persist token
+                try {
+                    if (tokenStore != null && tokenStore.isWritable()) {
+                        tokenStore.writeToken(currentToken.get());
+                        log.info("Persisted token to token store");
+                    }
+                } catch (TokenStorageException e) {
+                    log.error("Failed to persist token: {}", e.getMessage(), e);
+                }
                 // Start periodic renewal if enabled
                 if (params.isTokenRenewalEnabled()) {
                     startPeriodicRenewal();
                 } else {
-                    System.out.println("Token auto-renewal is disabled (tokenRenewalEnabled=false)");
+                    log.info("Token auto-renewal is disabled (tokenRenewalEnabled=false)");
                 }
             } else {
-                System.err.println("Failed to acquire initial JWT token");
-                // Fall back to configured token if available
-                if (params.getJwtToken() != null && !params.getJwtToken().isEmpty()) {
-                    currentToken.set(params.getJwtToken());
-                    System.out.println("Using pre-configured JWT token from properties (fallback)");
-                } else {
-                    throw new IllegalStateException("Failed to acquire JWT token and no fallback token configured");
+                log.error("Failed to acquire initial token");
+                // Fall back to token from token store if available
+                try {
+                    String stored = tokenStore != null ? tokenStore.readToken() : null;
+                    if (stored != null && !stored.isEmpty()) {
+                        currentToken.set(stored);
+                        log.info("Using token from token store (fallback)");
+                    } else {
+                        throw new IllegalStateException("Failed to acquire token and no fallback token available in token store");
+                    }
+                } catch (TokenStorageException e) {
+                    throw new IllegalStateException("Failed to acquire token and failed to read token store", e);
                 }
             }
-        } else {
-            // Manual mode - use pre-configured token WITHOUT auto-renewal
-            if (params.getJwtToken() == null || params.getJwtToken().isEmpty()) {
-                throw new IllegalStateException(
-                    "Manual token mode (tokenMode=manual) requires jwtToken to be configured. " +
-                    "Either provide a token or set tokenMode=auto with username/password"
-                );
+        } else { // MANUAL
+            // Manual mode - rely on token present in token store
+            try {
+                String stored = tokenStore != null ? tokenStore.readToken() : null;
+                if (stored == null || stored.isEmpty()) {
+                    throw new IllegalStateException(
+                        "Manual token mode (tokenMode=manual) requires a token present in the configured token store/file. " +
+                        "Please create the token file with the proxy server token."
+                    );
+                }
+                currentToken.set(stored);
+                log.info("Manual token mode enabled (tokenMode=manual)");
+                log.info("Using token from token store");
+                log.info("Auto-renewal is DISABLED in manual mode");
+            } catch (TokenStorageException e) {
+                throw new IllegalStateException("Manual mode requires a readable token store", e);
             }
-
-            currentToken.set(params.getJwtToken());
-            System.out.println("Manual token mode enabled (tokenMode=manual)");
-            System.out.println("Using JWT token from configuration");
-            System.out.println("Auto-renewal is DISABLED to allow token sharing across devices");
-            System.out.println("Token will be used until expiration. Renewal must be done manually.");
-
-            // Do NOT start auto-renewal in manual mode
-            // This allows users to share tokens across multiple devices/family members
-            // without one device's renewal invalidating tokens on other devices
         }
     }
 
     /**
-     * Acquire a new JWT token from the server using username/password
+     * Acquire a new token from the server using username/password
      */
     private boolean acquireToken() {
         try {
             String serverUrl = buildServerUrl() + "/api/auth/token/generate";
-            
+
             // Build JSON request body
             String jsonBody = String.format(
                 "{\"username\":\"%s\",\"password\":\"%s\",\"expirationMinutes\":%d}",
@@ -113,62 +167,75 @@ public class JwtTokenManager {
                 params.getPassword(),
                 params.getTokenExpirationMinutes()
             );
-            
+
             String response = sendHttpPost(serverUrl, jsonBody);
-            
+
             // Parse response (simple JSON parsing without external library)
             String token = extractTokenFromResponse(response);
             if (token != null && !token.isEmpty()) {
                 currentToken.set(token);
+                // persist
+                try {
+                    if (tokenStore != null && tokenStore.isWritable()) {
+                        tokenStore.writeToken(token);
+                    }
+                } catch (TokenStorageException e) {
+                    log.error("Failed to persist token after acquire: {}", e.getMessage(), e);
+                }
                 return true;
             }
-            
-            System.err.println("Failed to extract token from response: " + response);
+
+            log.error("Failed to extract token from response: {}", response);
             return false;
-            
+
         } catch (Exception e) {
-            System.err.println("Error acquiring JWT token: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Error acquiring token: {}", e.getMessage(), e);
             return false;
         }
     }
 
     /**
-     * Renew the current JWT token
+     * Renew the current token
      */
     private boolean renewToken() {
         try {
             String token = currentToken.get();
             if (token == null || token.isEmpty()) {
-                System.err.println("No current token to renew");
+                log.error("No current token to renew");
                 return acquireToken(); // Fall back to acquiring new token
             }
-            
+
             String serverUrl = buildServerUrl() + "/api/auth/token/generate";
-            
+
             // Build JSON request body
             String jsonBody = String.format(
                 "{\"currentToken\":\"%s\",\"expirationMinutes\":%d}",
                 token,
                 params.getTokenExpirationMinutes()
             );
-            
+
             String response = sendHttpPost(serverUrl, jsonBody);
-            
+
             // Parse response
             String newToken = extractTokenFromResponse(response);
             if (newToken != null && !newToken.isEmpty()) {
                 currentToken.set(newToken);
-                System.out.println("JWT token renewed successfully at " + new java.util.Date());
+                log.info("Token renewed successfully at {}", new java.util.Date());
+                try {
+                    if (tokenStore != null && tokenStore.isWritable()) {
+                        tokenStore.writeToken(newToken);
+                    }
+                } catch (TokenStorageException e) {
+                    log.error("Failed to persist token after renew: {}", e.getMessage(), e);
+                }
                 return true;
             }
-            
-            System.err.println("Failed to extract renewed token from response: " + response);
+
+            log.error("Failed to extract renewed token from response: {}", response);
             return false;
-            
+
         } catch (Exception e) {
-            System.err.println("Error renewing JWT token: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Error renewing token: {}", e.getMessage(), e);
             // Try to acquire new token if renewal fails
             return acquireToken();
         }
@@ -181,19 +248,18 @@ public class JwtTokenManager {
         if (running) {
             return;
         }
-        
+
         running = true;
         long renewalIntervalMinutes = params.getTokenRenewalIntervalMinutes();
-        
-        System.out.println("Starting JWT token renewal every " + renewalIntervalMinutes + " minutes");
-        
+
+        log.info("Starting token renewal every {} minutes", renewalIntervalMinutes);
+
         scheduler.scheduleAtFixedRate(() -> {
             try {
-                System.out.println("Attempting to renew JWT token...");
+                log.info("Attempting to renew token...");
                 renewToken();
             } catch (Exception e) {
-                System.err.println("Error in token renewal task: " + e.getMessage());
-                e.printStackTrace();
+                log.error("Error in token renewal task: {}", e.getMessage(), e);
             }
         }, renewalIntervalMinutes, renewalIntervalMinutes, TimeUnit.MINUTES);
     }
@@ -214,15 +280,37 @@ public class JwtTokenManager {
     }
 
     /**
-     * Get the current JWT token
+     * Get the current token
      */
     public String getCurrentToken() {
         String token = currentToken.get();
         if (token == null || token.isEmpty()) {
-            // Fall back to configured token
-            return params.getJwtToken();
+            // Fall back to reading from token store
+            try {
+                String stored = tokenStore != null ? tokenStore.readToken() : null;
+                return stored;
+            } catch (TokenStorageException e) {
+                log.error("Failed to read token store as fallback: {}", e.getMessage(), e);
+                return null;
+            }
         }
         return token;
+    }
+
+    /**
+     * Insert or replace the current token and persist it to the configured TokenStore (if writable).
+     * Caller will receive a TokenStorageException when persistence fails.
+     */
+    public void setToken(String token) throws TokenStorageException {
+        if (token == null || token.isEmpty()) throw new IllegalArgumentException("token must be non-empty");
+        currentToken.set(token);
+        if (tokenStore != null && tokenStore.isWritable()) {
+            tokenStore.writeToken(token);
+        } else if (tokenStore == null) {
+            throw new TokenStorageException("No token store configured to persist token");
+        } else {
+            throw new TokenStorageException("Token store is not writable: " + tokenStore.getClass().getName());
+        }
     }
 
     /**
@@ -240,63 +328,48 @@ public class JwtTokenManager {
         return sendHttpPost(urlString, jsonBody, 0);
     }
 
-    /**
-     * Send HTTP POST request with redirect handling
-     * @param urlString Target URL
-     * @param jsonBody JSON request body
-     * @param redirectCount Number of redirects followed (to prevent infinite loops)
-     * @return Response body
-     * @throws Exception if request fails
-     */
     private String sendHttpPost(String urlString, String jsonBody, int redirectCount) throws Exception {
-        // Prevent infinite redirect loops
         if (redirectCount > 5) {
             throw new Exception("Too many redirects (>5). Possible redirect loop.");
         }
 
         URL url = new URL(urlString);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        
+
         try {
             conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Content-Type","application/json");
             conn.setDoOutput(true);
             conn.setConnectTimeout(10000);
             conn.setReadTimeout(10000);
-            conn.setInstanceFollowRedirects(false); // Handle redirects manually
+            conn.setInstanceFollowRedirects(false);
 
             // Disable SSL certificate validation for self-signed certificates
             if (urlString.startsWith("https")) {
                 disableSslVerification(conn);
             }
-            
-            // Write request body
+
             try (OutputStream os = conn.getOutputStream()) {
                 os.write(jsonBody.getBytes(StandardCharsets.UTF_8));
                 os.flush();
             }
-            
-            // Read response
+
             int responseCode = conn.getResponseCode();
-            
-            // Handle redirects (307 Temporary Redirect)
+
             if (responseCode == 307 || responseCode == 308) {
                 String location = conn.getHeaderField("Location");
                 if (location == null || location.isEmpty()) {
                     throw new Exception("HTTP " + responseCode + " redirect but no Location header provided");
                 }
 
-                System.out.println("Following HTTP " + responseCode + " redirect to: " + location);
+                log.info("Following HTTP {} redirect to: {}", responseCode, location);
 
-                // Handle relative URLs
                 if (!location.startsWith("http://") && !location.startsWith("https://")) {
                     URL originalUrl = new URL(urlString);
                     if (location.startsWith("/")) {
-                        // Absolute path
                         location = originalUrl.getProtocol() + "://" + originalUrl.getHost() +
                                   (originalUrl.getPort() != -1 ? ":" + originalUrl.getPort() : "") + location;
                     } else {
-                        // Relative path
                         String basePath = originalUrl.getPath();
                         int lastSlash = basePath.lastIndexOf('/');
                         basePath = lastSlash >= 0 ? basePath.substring(0, lastSlash + 1) : "/";
@@ -305,7 +378,6 @@ public class JwtTokenManager {
                     }
                 }
 
-                // Follow redirect with same body
                 return sendHttpPost(location, jsonBody, redirectCount + 1);
             }
 
@@ -315,79 +387,66 @@ public class JwtTokenManager {
             } else {
                 br = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8));
             }
-            
+
             StringBuilder response = new StringBuilder();
             String line;
             while ((line = br.readLine()) != null) {
                 response.append(line);
             }
             br.close();
-            
+
             if (responseCode < 200 || responseCode >= 300) {
                 throw new Exception("HTTP request failed with status " + responseCode + ": " + response);
             }
-            
+
             return response.toString();
-            
+
         } finally {
             conn.disconnect();
         }
     }
 
-    /**
-     * Disable SSL certificate verification (for self-signed certificates)
-     */
     private void disableSslVerification(HttpURLConnection conn) {
         try {
             if (conn instanceof javax.net.ssl.HttpsURLConnection) {
                 javax.net.ssl.HttpsURLConnection httpsConn = (javax.net.ssl.HttpsURLConnection) conn;
-                
-                // Create a trust manager that accepts all certificates
+
                 javax.net.ssl.TrustManager[] trustAllCerts = new javax.net.ssl.TrustManager[]{
                     new javax.net.ssl.X509TrustManager() {
-                        public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-                            return null;
-                        }
-                        public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {
-                        }
-                        public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {
-                        }
+                        public java.security.cert.X509Certificate[] getAcceptedIssuers() { return null; }
+                        public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {}
+                        public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {}
                     }
                 };
-                
+
                 javax.net.ssl.SSLContext sc = javax.net.ssl.SSLContext.getInstance("SSL");
                 sc.init(null, trustAllCerts, new java.security.SecureRandom());
                 httpsConn.setSSLSocketFactory(sc.getSocketFactory());
-                
-                // Create hostname verifier that accepts all hostnames
+
                 httpsConn.setHostnameVerifier((hostname, session) -> true);
             }
         } catch (Exception e) {
-            System.err.println("Failed to disable SSL verification: " + e.getMessage());
+            log.error("Failed to disable SSL verification: {}", e.getMessage(), e);
         }
     }
 
-    /**
-     * Extract token from JSON response (simple parsing without external library)
-     */
     private String extractTokenFromResponse(String jsonResponse) {
         try {
-            // Look for "token":"..." pattern
             String tokenPattern = "\"token\":\"";
             int tokenStart = jsonResponse.indexOf(tokenPattern);
             if (tokenStart == -1) {
                 return null;
             }
-            
+
             tokenStart += tokenPattern.length();
             int tokenEnd = jsonResponse.indexOf("\"", tokenStart);
             if (tokenEnd == -1) {
                 return null;
             }
-            
+
             return jsonResponse.substring(tokenStart, tokenEnd);
         } catch (Exception e) {
-            System.err.println("Error extracting token from response: " + e.getMessage());
+            log.error("Error extracting token from response: {}", e.getMessage(), e);
             return null;
         }
     }
