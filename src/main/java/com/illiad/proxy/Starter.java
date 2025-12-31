@@ -1,5 +1,6 @@
 package com.illiad.proxy;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.illiad.proxy.codec.v5.V5InitReqDecoder;
 import com.illiad.proxy.handler.http.FrontHandler;
 import com.illiad.proxy.handler.v5.V5CommandHandler;
@@ -41,7 +42,7 @@ public class Starter {
     }
 
     @PostConstruct
-    public void startServers() throws InterruptedException {
+    public void startServers() throws InterruptedException, JsonProcessingException {
         // Initialize JWT token manager (acquire token and start renewal if needed)
         bus.tokenManager.initialize();
 
