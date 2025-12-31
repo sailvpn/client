@@ -37,7 +37,5 @@ public class Params {
     // JWT token mode: use TokenMode enum instead of raw string
     String tokenMode = System.getProperty("tokenMode", "MANUAL"); // kept as raw property for Spring binding/backwards compatibility
     // JWT auto-renewal settings
-    boolean tokenRenewalEnabled = Boolean.parseBoolean(System.getProperty("tokenRenewalEnabled", "true"));
-    int tokenRenewalIntervalMinutes = Integer.parseInt(System.getProperty("tokenRenewalIntervalMinutes", "10")); // 10 minutes default
-
+    int renewInterval = Integer.parseInt(System.getProperty("tokenRenewalIntervalMinutes", "30")); // 30 minutes default
 }
