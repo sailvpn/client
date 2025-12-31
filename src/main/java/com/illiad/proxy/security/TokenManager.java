@@ -12,16 +12,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import reactor.core.publisher.Mono;
+import reactor.netty.http.client.HttpClient;
 
 /**
  * Token Manager
@@ -35,11 +35,14 @@ public class TokenManager {
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private volatile boolean running = false;
     private final TokenStore tokenStore;
-    private TokenHolder tHolder;
+
+    // Holds the last known token and its expiresAt
+    private final AtomicReference<TokenHolder> current = new AtomicReference<>();
+
     @Autowired
     public TokenManager(Params params) throws TokenStorageException, JsonProcessingException {
-
         this.params = params;
+
         // Determine path priority: Params (application.properties) > env JWT_TOKEN_FILE > system property jwtTokenFile > default
         String configured = params.getJwtTokenFile();
         if (configured != null && !configured.isEmpty()) {
@@ -58,15 +61,13 @@ public class TokenManager {
             }
         }
 
-        // Attempt to read existing token from TokenStore
+        // Load existing token holder from store if present
         String stored = tokenStore.read();
-        if (stored != null && !stored.isEmpty()) {
-            tHolder = objMapper.readValue(stored, TokenHolder.class);
-            log.info("Loaded token from token store");
+        if (stored == null || stored.isEmpty()) {
+            current.set(emptyHolder());
         } else {
-            tHolder = new TokenHolder();
-            tHolder.setToken(null);
-            tHolder.setExpiresAt(Instant.EPOCH);
+            TokenHolder holder = objMapper.readValue(stored, TokenHolder.class);
+            current.set(Objects.requireNonNullElseGet(holder, TokenManager::emptyHolder));
         }
     }
 
@@ -74,114 +75,127 @@ public class TokenManager {
     TokenManager(Params params, TokenStore store) {
         this.params = params;
         this.tokenStore = store;
+        this.current.set(emptyHolder());
+    }
+
+    private static TokenHolder emptyHolder() {
+        TokenHolder h = new TokenHolder();
+        h.setToken(null);
+        h.setExpiresAt(Instant.EPOCH);
+        return h;
     }
 
     /**
      * Initialize token management - acquire initial token and start renewal
      */
     public void initialize() {
-        if (!params.getCrypto().equals("JWT")) {
+        if (!Objects.equals(params.getCrypto(), "JWT")) {
             log.info("Token management disabled (crypto != JWT)");
             return;
         }
 
-        TokenMode tokenMode = TokenMode.valueOf(params.getTokenMode());
-
-        if (tokenMode == TokenMode.AUTO) {
+        if (TokenMode.AUTO == TokenMode.valueOf(params.getTokenMode())) {
             log.info("Automatic token mode enabled (tokenMode=auto)");
 
-            boolean haveCurrent = currentToken.get() != null && !currentToken.get().isEmpty();
+            // If no token present or expired => try to acquire via username/password
+            if (current.get().isExpired()) {
+                log.info("No usable token found or token expired; attempting credential-based acquisition");
+                if (!acquireTokenWithCredentialsOrThrow())
+                    return; // acquireTokenWithCredentialsOrThrow will throw on failure
 
-            // First priority: try renewing using the current token (if any)
-            if (haveCurrent) {
-                log.info("Attempting to renew token using current token");
-                try {
-                    if (renewToken()) {
-                        log.info("Successfully renewed token using current token");
-                        // Persist token
-                        try {
-                            if (tokenStore != null && tokenStore.isWritable()) {
-                                tokenStore.writeToken(currentToken.get());
-                                log.info("Persisted renewed token to token store");
-                            }
-                        } catch (TokenStorageException e) {
-                            log.error("Failed to persist renewed token: {}", e.getMessage(), e);
-                        }
-
-                        // Start periodic renewal if enabled
-                        if (params.isTokenRenewalEnabled()) {
-                            startPeriodicRenewal();
-                        } else {
-                            log.info("Token auto-renewal is disabled (tokenRenewalEnabled=false)");
-                        }
-
-                        return; // initialization complete
-                    } else {
-                        log.warn("Renewal using current token failed; will attempt to acquire by credentials if available");
-                    }
-                } catch (Exception e) {
-                    log.warn("Renewal using current token threw exception: {}", e.getMessage());
-                }
-            }
-
-            // If we reach here, either there was no current token, or renewing it failed.
-            // Next priority: try username/password if provided.
-            if (params.getUsername() == null || params.getUsername().isEmpty() ||
-                params.getPassword() == null || params.getPassword().isEmpty()) {
-                throw new IllegalStateException(
-                    "Automatic token mode (tokenMode=auto) requires a valid current token or username/password. " +
-                    "No usable current token and no credentials provided."
-                );
-            }
-
-            log.info("Attempting to acquire token using username/password for user: {}", params.getUsername());
-
-            if (acquireToken()) {
-                log.info("Successfully acquired token via username/password");
-
-                // Persist token
-                try {
-                    if (tokenStore != null && tokenStore.isWritable()) {
-                        tokenStore.writeToken(currentToken.get());
-                        log.info("Persisted token to token store");
-                    }
-                } catch (TokenStorageException e) {
-                    log.error("Failed to persist token: {}", e.getMessage(), e);
-                }
-
-                // Start periodic renewal if enabled
-                if (params.isTokenRenewalEnabled()) {
-                    startPeriodicRenewal();
-                } else {
-                    log.info("Token auto-renewal is disabled (tokenRenewalEnabled=false)");
-                }
-
+                // start renewal if enabled
+                startAutoRenewal();
+                return;
+                // Token not expired. Check remaining validity.
+            } else if (Duration.between(Instant.now(), current.get().getExpiresAt()).toMinutes() < params.getRenewInterval() * 5L) {
+                log.info("Token expired; will acquire via credentials");
+                if (!renewTokenOrThrow()) return;
             } else {
-                throw new IllegalStateException("Failed to acquire token using provided username/password and renewal with current token failed");
+                log.info("Token is valid ({} minutes remaining). Using current token", minutesRemaining);
+                // persist current holder to ensure store has latest
+                try {
+                    persistCurrentHolder();
+                } catch (TokenStorageException e) {
+                    log.error("Failed to persist token store during initialization: {}", e.getMessage(), e);
+                }
             }
+
+
+            if (params.isTokenRenewalEnabled()) startPeriodicRenewal();
 
         } else { // MANUAL
             // Manual mode - rely on token present in token store
             try {
-                String stored = tokenStore != null ? tokenStore.readToken() : null;
+                String stored = tokenStore != null ? tokenStore.read() : null;
                 if (stored == null || stored.isEmpty()) {
                     throw new IllegalStateException(
                         "Manual token mode (tokenMode=manual) requires a token present in the configured token store/file. " +
                         "Please create the token file with the proxy server token."
                     );
                 }
-                currentToken.set(stored);
+                TokenHolder holder = objMapper.readValue(stored, TokenHolder.class);
+                if (holder == null || holder.getToken() == null || holder.getToken().isEmpty()) {
+                    throw new IllegalStateException("Manual mode token file does not contain a valid token");
+                }
+                current.set(holder);
                 log.info("Manual token mode enabled (tokenMode=manual)");
                 log.info("Using token from token store");
                 log.info("Auto-renewal is DISABLED in manual mode");
             } catch (TokenStorageException e) {
                 throw new IllegalStateException("Manual mode requires a readable token store", e);
+            } catch (Exception e) {
+                throw new IllegalStateException("Failed to parse token from token store", e);
             }
         }
     }
 
     /**
-     * Acquire a new token from the server using username/password
+     * Acquire a new token from the server using username/password. Throws on failure.
+     */
+    private boolean acquireTokenWithCredentialsOrThrow() {
+        if (params.getUsername() == null || params.getUsername().isEmpty() ||
+            params.getPassword() == null || params.getPassword().isEmpty()) {
+            throw new IllegalStateException("Automatic token mode requires username/password when no valid token is available");
+        }
+
+        boolean ok = acquireToken();
+        if (!ok) {
+            throw new IllegalStateException("Failed to acquire token using provided username/password");
+        }
+        return true;
+    }
+
+    private boolean renewTokenOrThrow() {
+        boolean ok = renewToken();
+        if (!ok) {
+            // Try to acquire with credentials as fallback
+            log.warn("Renewal failed; attempting credential-based acquisition as fallback");
+            return acquireTokenWithCredentialsOrThrow();
+        }
+        return true;
+    }
+
+    /**
+     * Send HTTP POST request using Netty HttpClient
+     */
+    private Mono<String> sendHttpPost(String urlString, String jsonBody) {
+        HttpClient client = HttpClient.create();
+
+        return client.post()
+                .uri(urlString)
+                .send(Mono.just(jsonBody).map(body -> body.getBytes(StandardCharsets.UTF_8)))
+                .responseSingle((response, byteBufMono) -> {
+                    if (response.status().code() >= 200 && response.status().code() < 300) {
+                        return byteBufMono.asString(StandardCharsets.UTF_8);
+                    } else {
+                        return byteBufMono.asString(StandardCharsets.UTF_8)
+                                .flatMap(body -> Mono.error(new RuntimeException("HTTP request failed with status " + response.status().code() + ": " + body)));
+                    }
+                });
+    }
+
+    /**
+     * Acquire a new token from the server using username/password (non-throwing variant)
      */
     private boolean acquireToken() {
         try {
@@ -195,17 +209,14 @@ public class TokenManager {
                 params.getTokenExpirationMinutes()
             );
 
-            String response = sendHttpPost(serverUrl, jsonBody);
+            String response = sendHttpPost(serverUrl, jsonBody).block();
 
-            // Parse response (simple JSON parsing without external library)
-            String token = extractTokenFromResponse(response);
-            if (token != null && !token.isEmpty()) {
-                currentToken.set(token);
-                // persist
+            // Parse response into TokenHolder (expects data.expiresAt and data.token)
+            TokenHolder holder = parseTokenHolderFromApiResponse(response);
+            if (holder != null && holder.getToken() != null && !holder.getToken().isEmpty()) {
+                current.set(holder);
                 try {
-                    if (tokenStore != null && tokenStore.isWritable()) {
-                        tokenStore.writeToken(token);
-                    }
+                    persistCurrentHolder();
                 } catch (TokenStorageException e) {
                     log.error("Failed to persist token after acquire: {}", e.getMessage(), e);
                 }
@@ -222,39 +233,36 @@ public class TokenManager {
     }
 
     /**
-     * Renew the current token
+     * Renew the current token (non-throwing variant). Tries renew API with current token and updates store.
      */
     private boolean renewToken() {
         try {
-            String token = currentToken.get();
-            if (token == null || token.isEmpty()) {
+            TokenHolder holder = current.get();
+            if (holder == null || holder.getToken() == null || holder.getToken().isEmpty()) {
                 log.error("No current token to renew");
-                return acquireToken(); // Fall back to acquiring new token
+                return false;
             }
 
             String serverUrl = buildServerUrl() + "/api/auth/token/generate";
 
-            // Build JSON request body
+            // Build JSON request body for renewal
             String jsonBody = String.format(
                 "{\"currentToken\":\"%s\",\"expirationMinutes\":%d}",
-                token,
+                holder.getToken(),
                 params.getTokenExpirationMinutes()
             );
 
-            String response = sendHttpPost(serverUrl, jsonBody);
+            String response = sendHttpPost(serverUrl, jsonBody).block();
 
-            // Parse response
-            String newToken = extractTokenFromResponse(response);
-            if (newToken != null && !newToken.isEmpty()) {
-                currentToken.set(newToken);
-                log.info("Token renewed successfully at {}", new java.util.Date());
+            TokenHolder newHolder = parseTokenHolderFromApiResponse(response);
+            if (newHolder != null && newHolder.getToken() != null && !newHolder.getToken().isEmpty()) {
+                current.set(newHolder);
                 try {
-                    if (tokenStore != null && tokenStore.isWritable()) {
-                        tokenStore.writeToken(newToken);
-                    }
+                    persistCurrentHolder();
                 } catch (TokenStorageException e) {
                     log.error("Failed to persist token after renew: {}", e.getMessage(), e);
                 }
+                log.info("Token renewed successfully at {}", Instant.now());
                 return true;
             }
 
@@ -263,15 +271,14 @@ public class TokenManager {
 
         } catch (Exception e) {
             log.error("Error renewing token: {}", e.getMessage(), e);
-            // Try to acquire new token if renewal fails
-            return acquireToken();
+            return false;
         }
     }
 
     /**
      * Start periodic token renewal
      */
-    private void startPeriodicRenewal() {
+    private void startAutoRenewal() {
         if (running) {
             return;
         }
@@ -283,8 +290,9 @@ public class TokenManager {
 
         scheduler.scheduleAtFixedRate(() -> {
             try {
-                log.info("Attempting to renew token...");
-                renewToken();
+                log.info("Attempting to renew token... (scheduled)");
+                boolean ok = renewToken();
+                if (!ok) log.warn("Scheduled renewal failed");
             } catch (Exception e) {
                 log.error("Error in token renewal task: {}", e.getMessage(), e);
             }
@@ -307,36 +315,31 @@ public class TokenManager {
     }
 
     /**
-     * Get the current token
+     * Get the current token string
      */
     public String getCurrentToken() {
-        String token = currentToken.get();
-        if (token == null || token.isEmpty()) {
-            // Fall back to reading from token store
-            try {
-                String stored = tokenStore != null ? tokenStore.readToken() : null;
-                return stored;
-            } catch (TokenStorageException e) {
-                log.error("Failed to read token store as fallback: {}", e.getMessage(), e);
-                return null;
-            }
-        }
-        return token;
+        TokenHolder holder = current.get();
+        if (holder == null) return null;
+        return holder.getToken();
     }
 
     /**
-     * Insert or replace the current token and persist it to the configured TokenStore (if writable).
-     * Caller will receive a TokenStorageException when persistence fails.
+     * Insert or replace the current token holder and persist it to the configured TokenStore (if writable).
      */
-    public void setToken(String token) throws TokenStorageException {
-        if (token == null || token.isEmpty()) throw new IllegalArgumentException("token must be non-empty");
-        currentToken.set(token);
-        if (tokenStore != null && tokenStore.isWritable()) {
-            tokenStore.writeToken(token);
-        } else if (tokenStore == null) {
-            throw new TokenStorageException("No token store configured to persist token");
-        } else {
-            throw new TokenStorageException("Token store is not writable: " + tokenStore.getClass().getName());
+    public void setTokenHolder(TokenHolder holder) throws TokenStorageException {
+        if (holder == null || holder.getToken() == null || holder.getToken().isEmpty()) throw new IllegalArgumentException("holder must contain a non-empty token");
+        current.set(holder);
+        persistCurrentHolder();
+    }
+
+    private void persistCurrentHolder() throws TokenStorageException {
+        if (tokenStore == null) throw new TokenStorageException("No token store configured to persist token");
+        if (!tokenStore.isWritable()) throw new TokenStorageException("Token store is not writable: " + tokenStore.getClass().getName());
+        try {
+            String json = objMapper.writeValueAsString(current.get());
+            tokenStore.write(json);
+        } catch (Exception e) {
+            throw new TokenStorageException("Failed to persist token: " + e.getMessage(), e);
         }
     }
 
@@ -348,132 +351,21 @@ public class TokenManager {
         return protocol + "://" + params.getRemoteHost() + ":" + params.getRemotePort();
     }
 
-    /**
-     * Send HTTP POST request with redirect handling
-     */
-    private String sendHttpPost(String urlString, String jsonBody) throws Exception {
-        return sendHttpPost(urlString, jsonBody, 0);
-    }
-
-    private String sendHttpPost(String urlString, String jsonBody, int redirectCount) throws Exception {
-        if (redirectCount > 5) {
-            throw new Exception("Too many redirects (>5). Possible redirect loop.");
-        }
-
-        URL url = new URL(urlString);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-
+    private TokenHolder parseTokenHolderFromApiResponse(String jsonResponse) {
         try {
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type","application/json");
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(10000);
-            conn.setReadTimeout(10000);
-            conn.setInstanceFollowRedirects(false);
-
-            // Disable SSL certificate validation for self-signed certificates
-            if (urlString.startsWith("https")) {
-                disableSslVerification(conn);
-            }
-
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(jsonBody.getBytes(StandardCharsets.UTF_8));
-                os.flush();
-            }
-
-            int responseCode = conn.getResponseCode();
-
-            if (responseCode == 307 || responseCode == 308) {
-                String location = conn.getHeaderField("Location");
-                if (location == null || location.isEmpty()) {
-                    throw new Exception("HTTP " + responseCode + " redirect but no Location header provided");
-                }
-
-                log.info("Following HTTP {} redirect to: {}", responseCode, location);
-
-                if (!location.startsWith("http://") && !location.startsWith("https://")) {
-                    URL originalUrl = new URL(urlString);
-                    if (location.startsWith("/")) {
-                        location = originalUrl.getProtocol() + "://" + originalUrl.getHost() +
-                                  (originalUrl.getPort() != -1 ? ":" + originalUrl.getPort() : "") + location;
-                    } else {
-                        String basePath = originalUrl.getPath();
-                        int lastSlash = basePath.lastIndexOf('/');
-                        basePath = lastSlash >= 0 ? basePath.substring(0, lastSlash + 1) : "/";
-                        location = originalUrl.getProtocol() + "://" + originalUrl.getHost() +
-                                  (originalUrl.getPort() != -1 ? ":" + originalUrl.getPort() : "") + basePath + location;
-                    }
-                }
-
-                return sendHttpPost(location, jsonBody, redirectCount + 1);
-            }
-
-            BufferedReader br;
-            if (responseCode >= 200 && responseCode < 300) {
-                br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
-            } else {
-                br = new BufferedReader(new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8));
-            }
-
-            StringBuilder response = new StringBuilder();
-            String line;
-            while ((line = br.readLine()) != null) {
-                response.append(line);
-            }
-            br.close();
-
-            if (responseCode < 200 || responseCode >= 300) {
-                throw new Exception("HTTP request failed with status " + responseCode + ": " + response);
-            }
-
-            return response.toString();
-
-        } finally {
-            conn.disconnect();
-        }
-    }
-
-    private void disableSslVerification(HttpURLConnection conn) {
-        try {
-            if (conn instanceof javax.net.ssl.HttpsURLConnection) {
-                javax.net.ssl.HttpsURLConnection httpsConn = (javax.net.ssl.HttpsURLConnection) conn;
-
-                javax.net.ssl.TrustManager[] trustAllCerts = new javax.net.ssl.TrustManager[]{
-                    new javax.net.ssl.X509TrustManager() {
-                        public java.security.cert.X509Certificate[] getAcceptedIssuers() { return null; }
-                        public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {}
-                        public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {}
-                    }
-                };
-
-                javax.net.ssl.SSLContext sc = javax.net.ssl.SSLContext.getInstance("SSL");
-                sc.init(null, trustAllCerts, new java.security.SecureRandom());
-                httpsConn.setSSLSocketFactory(sc.getSocketFactory());
-
-                httpsConn.setHostnameVerifier((hostname, session) -> true);
-            }
+            // Expecting structure: { "success": true, "reasonCode": 0, "data": { "expiresAt": "...Z", "token": "..." } }
+            // naive extraction: find "data":{ ... }
+            int dataIdx = jsonResponse.indexOf("\"data\"");
+            if (dataIdx == -1) return null;
+            int brace = jsonResponse.indexOf('{', dataIdx);
+            if (brace == -1) return null;
+            int end = jsonResponse.lastIndexOf('}');
+            if (end == -1 || end <= brace) return null;
+            String dataJson = jsonResponse.substring(brace, end + 1);
+            // map to TokenHolder
+            return objMapper.readValue(dataJson, TokenHolder.class);
         } catch (Exception e) {
-            log.error("Failed to disable SSL verification: {}", e.getMessage(), e);
-        }
-    }
-
-    private String extractTokenFromResponse(String jsonResponse) {
-        try {
-            String tokenPattern = "\"token\":\"";
-            int tokenStart = jsonResponse.indexOf(tokenPattern);
-            if (tokenStart == -1) {
-                return null;
-            }
-
-            tokenStart += tokenPattern.length();
-            int tokenEnd = jsonResponse.indexOf("\"", tokenStart);
-            if (tokenEnd == -1) {
-                return null;
-            }
-
-            return jsonResponse.substring(tokenStart, tokenEnd);
-        } catch (Exception e) {
-            log.error("Error extracting token from response: {}", e.getMessage(), e);
+            log.error("Failed to parse token holder from API response: {}", e.getMessage());
             return null;
         }
     }
