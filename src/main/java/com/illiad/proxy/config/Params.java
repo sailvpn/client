@@ -32,10 +32,10 @@ public class Params {
     // JWT auto-acquisition settings
     String username = System.getProperty("username", "");
     String password = System.getProperty("password", "");
-    int tokenExpirationMinutes = Integer.parseInt(System.getProperty("tokenExpirationMinutes", "43200")); // 30 days default
+    Long expireMins = Long.parseLong(System.getProperty("expireMins", "43200")); // 30 days default
 
     // JWT token mode: use TokenMode enum instead of raw string
     String tokenMode = System.getProperty("tokenMode", "MANUAL"); // kept as raw property for Spring binding/backwards compatibility
     // JWT auto-renewal settings
-    int renewInterval = Integer.parseInt(System.getProperty("tokenRenewalIntervalMinutes", "30")); // 30 minutes default
+    Long renewInterval = Long.parseLong(System.getProperty("renewInterval", "30")); // 30 minutes default
 }
