@@ -1,3 +1,4 @@
+
 package com.illiad.proxy.security;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -8,45 +9,40 @@ import com.illiad.proxy.config.Params;
 import com.illiad.proxy.config.TokenMode;
 import com.illiad.proxy.dto.TokenGenerateRequest;
 import io.netty.buffer.Unpooled;
-import org.springframework.stereotype.Component;
-import org.springframework.beans.factory.annotation.Autowired;
-
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
+import reactor.core.Disposable;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import reactor.netty.http.client.HttpClient;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import reactor.core.publisher.Mono;
-import reactor.netty.http.client.HttpClient;
-
-/**
- * Token Manager
- * Handles automatic token acquisition and renewal for the proxy client
- */
 @Component
 public class TokenManager {
     private static final Logger log = LoggerFactory.getLogger(TokenManager.class);
     private final Params params;
     private final ObjectMapper objMapper = createObjectMapper();
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final HttpClient client;
     private final TokenStore tokenStore;
     private volatile boolean running = false;
-    // Holds the last known token and its expiresAt
     private final AtomicReference<TokenHolder> current = new AtomicReference<>();
+    private volatile Disposable renewDisposable;
 
     @Autowired
     public TokenManager(Params params, HttpClient client) throws TokenStorageException, JsonProcessingException {
         this.params = params;
         this.client = client;
-        // Determine path priority: Params (application.properties) > env JWT_TOKEN_FILE > system property jwtTokenFile > default
+
+        // tokenStore selection unchanged
         String configured = params.getJwtTokenFile();
         if (configured != null && !configured.isEmpty()) {
             this.tokenStore = new FileTokenStore(configured);
@@ -64,7 +60,7 @@ public class TokenManager {
             }
         }
 
-        // Load existing token holder from store if present
+        // Load existing token holder from store if present (off main reactor threads)
         String stored = tokenStore.read();
         if (stored == null || stored.isEmpty()) {
             current.set(emptyHolder());
@@ -74,7 +70,7 @@ public class TokenManager {
         }
     }
 
-    // For tests or explicit wiring (package-private)
+    // package-private constructor for tests
     TokenManager(Params params, HttpClient client, TokenStore store) {
         this.params = params;
         this.client = client;
@@ -89,6 +85,48 @@ public class TokenManager {
         return h;
     }
 
+    private static ObjectMapper createObjectMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        return mapper;
+    }
+
+    /**
+     * Centralized POST to token/generate and parse into TokenHolder.
+     * Ensures file writes happen on boundedElastic scheduler.
+     */
+    private Mono<TokenHolder> postGenerate(byte[] requestBytes) {
+        String uri = "https://" + params.getRemoteHost() + ":" + params.getRemotePort() + "/api/auth/token/generate";
+        return client
+                .headers(headers -> headers.set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON))
+                .post().uri(uri)
+                .send(Mono.just(Unpooled.wrappedBuffer(requestBytes)))
+                .responseSingle((response, byteBufMono) ->
+                        byteBufMono.asString(StandardCharsets.UTF_8)
+                                .flatMap(body -> {
+                                    int code = response.status().code();
+                                    if (code >= 200 && code < 300) {
+                                        try {
+                                            TokenHolder th = objMapper.readValue(body, TokenHolder.class);
+                                            return Mono.just(th);
+                                        } catch (JsonProcessingException e) {
+                                            return Mono.error(e);
+                                        }
+                                    } else {
+                                        return Mono.error(new RuntimeException("HTTP " + code + ": " + body));
+                                    }
+                                })
+                )
+                // persist token to store on boundedElastic to avoid blocking reactor event loops
+                .flatMap(holder ->
+                        Mono.fromCallable(() -> {
+                            tokenStore.write(objMapper.writeValueAsString(holder));
+                            return holder;
+                        }).subscribeOn(Schedulers.boundedElastic())
+                );
+    }
+
     /**
      * Initialize token management - acquire initial token and start renewal
      */
@@ -98,85 +136,56 @@ public class TokenManager {
             return;
         }
 
-        if (TokenMode.AUTO == TokenMode.valueOf(params.getTokenMode())) {
+        TokenMode mode;
+        try {
+            mode = TokenMode.valueOf(params.getTokenMode().toUpperCase());
+        } catch (Exception ex) {
+            throw new IllegalStateException("Invalid tokenMode: " + params.getTokenMode(), ex);
+        }
+
+        if (TokenMode.AUTO == mode) {
             log.info("Automatic token mode enabled (tokenMode=auto)");
 
+            // If no token present or expired => try to acquire via username/password synchronously (fail fast)
             if (current.get().isExpired()) {
-                // If no token present or expired => try to acquire via username/password
                 if (params.getUsername() == null || params.getUsername().isEmpty() ||
                         params.getPassword() == null || params.getPassword().isEmpty()) {
                     throw new IllegalStateException("Automatic token mode requires username/password when no valid token is available");
                 }
 
-                // Build JSON request body
                 TokenGenerateRequest req = new TokenGenerateRequest();
                 req.setUsername(params.getUsername());
                 req.setPassword(params.getPassword());
                 req.setExpirationMinutes(params.getExpireMins());
                 byte[] requestBytes = objMapper.writeValueAsBytes(req);
 
-                client.post()
-                        .uri("https://" + params.getRemoteHost() + ":" + params.getRemotePort() + "/api/auth/token/generate")
-                        .send(Mono.just(Unpooled.wrappedBuffer(requestBytes)))
-                        .responseSingle((response, byteBufMono) -> {
-                            if (response.status().code() >= 200 && response.status().code() < 300) {
-                                return byteBufMono.asString(StandardCharsets.UTF_8);
-                            } else {
-                                return byteBufMono.asString(StandardCharsets.UTF_8)
-                                        .flatMap(body -> Mono.error(new RuntimeException("HTTP request failed with status " + response.status().code() + ": " + body)));
-                            }
-                        }).subscribe(s -> {
-                            // Parse response into TokenHolder (expects data.expiresAt and data.token)
-                            try {
-                                tokenStore.write(s);
-                                TokenHolder holder = objMapper.readValue(s, TokenHolder.class);
-                                current.set(Objects.requireNonNullElseGet(holder, TokenManager::emptyHolder));
-                            } catch (TokenStorageException | JsonProcessingException e) {
-                                throw new RuntimeException(e);
-                            }
-                        }, error -> {
-                            log.error("Error acquiring token: {}", error.getMessage(), error);
-                        });
-
-                // Token not expired. Check remaining validity.
+                try {
+                    // block with a reasonable timeout so startup fails fast on misconfiguration
+                    TokenHolder holder = postGenerate(requestBytes)
+                            .timeout(Duration.ofSeconds(10))
+                            .block();
+                    current.set(Objects.requireNonNullElseGet(holder, TokenManager::emptyHolder));
+                } catch (Exception e) {
+                    throw new IllegalStateException("Failed to acquire initial token", e);
+                }
             } else if (Duration.between(Instant.now(), current.get().getExpiresAt()).toMinutes() < params.getRenewInterval() * 5L) {
-                // Build JSON request body
-
+                // Proactively renew once at startup if close to expiry; do this asynchronously (don't block startup)
                 TokenGenerateRequest req = new TokenGenerateRequest();
                 req.setCurrentToken(current.get().getToken());
                 req.setExpirationMinutes(params.getExpireMins());
-                byte[] requestBytes = objMapper.writeValueAsBytes(req);
-
-                client.post()
-                        .uri("https://" + params.getRemoteHost() + ":" + params.getRemotePort() + "/api/auth/token/generate")
-                        .send(Mono.just(Unpooled.wrappedBuffer(requestBytes)))
-                        .responseSingle((response, byteBufMono) -> {
-                            if (response.status().code() >= 200 && response.status().code() < 300) {
-                                return byteBufMono.asString(StandardCharsets.UTF_8);
-                            } else {
-                                return byteBufMono.asString(StandardCharsets.UTF_8)
-                                        .flatMap(body -> Mono.error(new RuntimeException("HTTP request failed with status " + response.status().code() + ": " + body)));
-                            }
-                        }).subscribe(s -> {
-                            // Parse response into TokenHolder (expects data.expiresAt and data.token)
-                            try {
-                                tokenStore.write(s);
-                                TokenHolder holder = objMapper.readValue(s, TokenHolder.class);
-                                current.set(Objects.requireNonNullElseGet(holder, TokenManager::emptyHolder));
-                            } catch (TokenStorageException | JsonProcessingException e) {
-                                throw new RuntimeException(e);
-                            }
-                        }, error -> {
-                            log.error("Error acquiring token: {}", error.getMessage(), error);
-                        });
+                byte[] requestBytes;
+                try {
+                    requestBytes = objMapper.writeValueAsBytes(req);
+                    postGenerate(requestBytes)
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .subscribe(current::set, err -> log.error("Error acquiring token: {}", err.getMessage(), err));
+                } catch (JsonProcessingException e) {
+                    log.error("Failed to build token renewal request", e);
+                }
             }
 
-
-            // start renewal if enabled
             startAutoRenewal();
-
         } else { // MANUAL
-            // Manual mode - rely on token present in token store
             try {
                 String stored = tokenStore != null ? tokenStore.read() : null;
                 if (stored == null || stored.isEmpty()) {
@@ -201,54 +210,37 @@ public class TokenManager {
         }
     }
 
-
     /**
-     * Start periodic token renewal
+     * Start periodic token renewal using Reactor's Flux.interval and track the Disposable.
      */
     private void startAutoRenewal() {
         if (running) {
             return;
         }
-
         running = true;
         long renewInterval = params.getRenewInterval();
-
         log.info("Starting token renewal every {} minutes", renewInterval);
 
-        scheduler.scheduleAtFixedRate(() -> {
-            try {
-                log.info("Attempting to renew token... (scheduled)");
-                TokenGenerateRequest req = new TokenGenerateRequest();
-                req.setCurrentToken(current.get().getToken());
-                req.setExpirationMinutes(params.getExpireMins());
-                byte[] requestBytes = objMapper.writeValueAsBytes(req);
-
-                client.post()
-                        .uri("https://" + params.getRemoteHost() + ":" + params.getRemotePort() + "/api/auth/token/generate")
-                        .send(Mono.just(Unpooled.wrappedBuffer(requestBytes)))
-                        .responseSingle((response, byteBufMono) -> {
-                            if (response.status().code() >= 200 && response.status().code() < 300) {
-                                return byteBufMono.asString(StandardCharsets.UTF_8);
-                            } else {
-                                return byteBufMono.asString(StandardCharsets.UTF_8)
-                                        .flatMap(body -> Mono.error(new RuntimeException("HTTP request failed with status " + response.status().code() + ": " + body)));
-                            }
-                        }).subscribe(s -> {
-                            // Parse response into TokenHolder (expects data.expiresAt and data.token)
-                            try {
-                                tokenStore.write(s);
-                                TokenHolder holder = objMapper.readValue(s, TokenHolder.class);
-                                current.set(Objects.requireNonNullElseGet(holder, TokenManager::emptyHolder));
-                            } catch (TokenStorageException | JsonProcessingException e) {
-                                throw new RuntimeException(e);
-                            }
-                        }, error -> {
-                            log.error("Error acquiring token: {}", error.getMessage(), error);
-                        });
-            } catch (Exception e) {
-                log.error("Error in token renewal task: {}", e.getMessage(), e);
-            }
-        }, renewInterval, renewInterval, TimeUnit.MINUTES);
+        // build bytes template for renew requests when needed
+        renewDisposable = reactor.core.publisher.Flux.interval(Duration.ofMinutes(renewInterval), Duration.ofMinutes(renewInterval), Schedulers.parallel())
+                .flatMap(tick -> {
+                    try {
+                        TokenGenerateRequest req = new TokenGenerateRequest();
+                        req.setCurrentToken(current.get().getToken());
+                        req.setExpirationMinutes(params.getExpireMins());
+                        byte[] requestBytes = objMapper.writeValueAsBytes(req);
+                        return postGenerate(requestBytes)
+                                .doOnNext(current::set)
+                                .onErrorResume(e -> {
+                                    log.error("Error renewing token: {}", e.getMessage(), e);
+                                    return Mono.empty();
+                                });
+                    } catch (JsonProcessingException e) {
+                        log.error("Failed to serialize renewal request", e);
+                        return Mono.empty();
+                    }
+                })
+                .subscribe(); // keep Disposable in renewDisposable
     }
 
     /**
@@ -256,13 +248,8 @@ public class TokenManager {
      */
     public void shutdown() {
         running = false;
-        scheduler.shutdown();
-        try {
-            if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
-                scheduler.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            scheduler.shutdownNow();
+        if (renewDisposable != null && !renewDisposable.isDisposed()) {
+            renewDisposable.dispose();
         }
     }
 
@@ -273,16 +260,6 @@ public class TokenManager {
         TokenHolder holder = current.get();
         if (holder == null) return null;
         return holder.getToken();
-    }
-
-
-    private static ObjectMapper createObjectMapper() {
-        ObjectMapper mapper = new ObjectMapper();
-        // support java.time types (Instant, LocalDateTime, etc.)
-        mapper.registerModule(new JavaTimeModule());
-        // ensure dates are serialized/deserialized as ISO-8601 strings, not numbers
-        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        return mapper;
     }
 }
 
