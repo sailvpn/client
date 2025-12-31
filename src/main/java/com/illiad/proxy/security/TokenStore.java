@@ -7,12 +7,12 @@ public interface TokenStore {
     /**
      * Read token from the store. Returns null when no token available.
      */
-    String readToken() throws TokenStorageException;
+    String read() throws TokenStorageException;
 
     /**
      * Write token to the store. Implementations should persist the token.
      */
-    void writeToken(String token) throws TokenStorageException;
+    void write(String obj) throws TokenStorageException;
 
     /**
      * Whether the store is writable.

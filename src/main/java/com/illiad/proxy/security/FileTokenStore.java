@@ -16,42 +16,50 @@ import java.nio.file.StandardOpenOption;
 public class FileTokenStore implements TokenStore {
     private final Path path;
 
-    public FileTokenStore(String pathStr) {
+    public FileTokenStore(String pathStr) throws TokenStorageException {
         if (pathStr == null || pathStr.isEmpty()) {
             this.path = Paths.get("./token.jwt");
         } else {
             this.path = Paths.get(pathStr);
         }
+
+        // Ensure parent directory and file exist (create empty file if missing).
+        try {
+            Path parent = this.path.getParent();
+            if (parent == null) parent = Paths.get(".");
+            if (!Files.exists(parent)) {
+                Files.createDirectories(parent);
+            }
+            if (!Files.exists(this.path)) {
+                // create empty file if no such file exist
+                Files.createFile(this.path);
+            }
+        } catch (IOException e) {
+            throw new TokenStorageException(e.getMessage());
+        }
     }
 
     @Override
-    public String readToken() throws TokenStorageException {
+    public String read() throws TokenStorageException {
         try {
-            if (!Files.exists(path)) return null;
             byte[] b = Files.readAllBytes(path);
-            if (b == null || b.length == 0) return null;
-            String s = new String(b, StandardCharsets.UTF_8).trim();
-            return s.isEmpty() ? null : s;
+            if (b.length == 0) return null;
+            String obj = new String(b, StandardCharsets.UTF_8).trim();
+            return obj.isEmpty() ? null : obj;
         } catch (IOException e) {
             throw new TokenStorageException("Failed to read token from file: " + path, e);
         }
     }
 
     @Override
-    public void writeToken(String token) throws TokenStorageException {
-        if (token == null) throw new TokenStorageException("Cannot write null token");
-        byte[] bytes = token.getBytes(StandardCharsets.UTF_8);
+    public void write(String obj) throws TokenStorageException {
+        if (obj == null) throw new TokenStorageException("Cannot write null token");
         try {
             Path parent = path.getParent();
-            if (parent == null) parent = Paths.get(".");
-            if (!Files.exists(parent)) {
-                Files.createDirectories(parent);
-            }
-
             // Write to temp file in the same directory, then atomically move
             Path tmp = Files.createTempFile(parent, "token", ".tmp");
             try {
-                Files.write(tmp, bytes, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
+                Files.writeString(tmp, obj, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
                 try {
                     Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
                 } catch (AtomicMoveNotSupportedException amnse) {
@@ -60,7 +68,10 @@ public class FileTokenStore implements TokenStore {
                 }
             } finally {
                 // Ensure temp file is removed if it still exists
-                try { if (Files.exists(tmp)) Files.deleteIfExists(tmp); } catch (Exception ignored) {}
+                try {
+                    if (Files.exists(tmp)) Files.deleteIfExists(tmp);
+                } catch (Exception ignored) {
+                }
             }
         } catch (IOException e) {
             throw new TokenStorageException("Failed to write token to file: " + path, e);
@@ -70,23 +81,7 @@ public class FileTokenStore implements TokenStore {
     @Override
     public boolean isWritable() {
         try {
-            Path parent = path.getParent();
-            if (parent == null) parent = Paths.get(".");
-            if (!Files.exists(parent)) {
-                // try to create and delete a marker file to verify writability
-                try {
-                    Files.createDirectories(parent);
-                } catch (IOException e) {
-                    return false;
-                }
-            }
-
-            // If file exists, check writability on file; otherwise check parent dir writability
-            if (Files.exists(path)) {
-                return Files.isWritable(path);
-            } else {
-                return Files.isWritable(parent);
-            }
+            return Files.isWritable(path);
         } catch (Exception e) {
             return false;
         }

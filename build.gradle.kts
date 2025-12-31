@@ -21,6 +21,9 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter")
 	// https://mvnrepository.com/artifact/io.netty/netty-all
 	implementation("io.netty:netty-all")
+	// Jackson for JSON serialization
+	implementation("com.fasterxml.jackson.core:jackson-databind")
+	implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.2")
 	// https://mvnrepository.com/artifact/org.projectlombok/lombok
 	compileOnly("org.projectlombok:lombok")
 	annotationProcessor("org.projectlombok:lombok")
