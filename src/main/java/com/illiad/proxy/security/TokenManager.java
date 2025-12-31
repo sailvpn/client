@@ -1,5 +1,9 @@
 package com.illiad.proxy.security;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.illiad.proxy.config.Params;
 import com.illiad.proxy.config.TokenMode;
 import org.springframework.stereotype.Component;
@@ -14,10 +18,10 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Token Manager
@@ -27,13 +31,14 @@ import java.util.concurrent.atomic.AtomicReference;
 public class TokenManager {
     private static final Logger log = LoggerFactory.getLogger(TokenManager.class);
     private final Params params;
-    private final AtomicReference<String> currentToken = new AtomicReference<>();
+    private final ObjectMapper objMapper = createObjectMapper();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private volatile boolean running = false;
     private final TokenStore tokenStore;
-
+    private TokenHolder tHolder;
     @Autowired
-    public TokenManager(Params params) {
+    public TokenManager(Params params) throws TokenStorageException, JsonProcessingException {
+
         this.params = params;
         // Determine path priority: Params (application.properties) > env JWT_TOKEN_FILE > system property jwtTokenFile > default
         String configured = params.getJwtTokenFile();
@@ -52,6 +57,17 @@ public class TokenManager {
                 }
             }
         }
+
+        // Attempt to read existing token from TokenStore
+        String stored = tokenStore.read();
+        if (stored != null && !stored.isEmpty()) {
+            tHolder = objMapper.readValue(stored, TokenHolder.class);
+            log.info("Loaded token from token store");
+        } else {
+            tHolder = new TokenHolder();
+            tHolder.setToken(null);
+            tHolder.setExpiresAt(Instant.EPOCH);
+        }
     }
 
     // For tests or explicit wiring (package-private)
@@ -69,39 +85,59 @@ public class TokenManager {
             return;
         }
 
-        // Attempt to read existing token from TokenStore (if any)
-        try {
-            String stored = tokenStore != null ? tokenStore.readToken() : null;
-            if (stored != null && !stored.isEmpty()) {
-                currentToken.set(stored);
-                log.info("Loaded token from token store");
-            }
-        } catch (TokenStorageException e) {
-            log.error("Failed to read token from store: {}", e.getMessage(), e);
-        }
-
         TokenMode tokenMode = TokenMode.valueOf(params.getTokenMode());
 
-        if (tokenMode == null) {
-            throw new IllegalStateException("Invalid tokenMode: null. Must be 'auto' or 'manual'");
-        }
-
         if (tokenMode == TokenMode.AUTO) {
-            // Automatic mode - require username/password
+            log.info("Automatic token mode enabled (tokenMode=auto)");
+
+            boolean haveCurrent = currentToken.get() != null && !currentToken.get().isEmpty();
+
+            // First priority: try renewing using the current token (if any)
+            if (haveCurrent) {
+                log.info("Attempting to renew token using current token");
+                try {
+                    if (renewToken()) {
+                        log.info("Successfully renewed token using current token");
+                        // Persist token
+                        try {
+                            if (tokenStore != null && tokenStore.isWritable()) {
+                                tokenStore.writeToken(currentToken.get());
+                                log.info("Persisted renewed token to token store");
+                            }
+                        } catch (TokenStorageException e) {
+                            log.error("Failed to persist renewed token: {}", e.getMessage(), e);
+                        }
+
+                        // Start periodic renewal if enabled
+                        if (params.isTokenRenewalEnabled()) {
+                            startPeriodicRenewal();
+                        } else {
+                            log.info("Token auto-renewal is disabled (tokenRenewalEnabled=false)");
+                        }
+
+                        return; // initialization complete
+                    } else {
+                        log.warn("Renewal using current token failed; will attempt to acquire by credentials if available");
+                    }
+                } catch (Exception e) {
+                    log.warn("Renewal using current token threw exception: {}", e.getMessage());
+                }
+            }
+
+            // If we reach here, either there was no current token, or renewing it failed.
+            // Next priority: try username/password if provided.
             if (params.getUsername() == null || params.getUsername().isEmpty() ||
                 params.getPassword() == null || params.getPassword().isEmpty()) {
                 throw new IllegalStateException(
-                    "Automatic token mode (tokenMode=auto) requires username and password. " +
-                    "Either provide credentials or set tokenMode=manual"
+                    "Automatic token mode (tokenMode=auto) requires a valid current token or username/password. " +
+                    "No usable current token and no credentials provided."
                 );
             }
 
-            log.info("Automatic token mode enabled (tokenMode=auto)");
-            log.info("Auto-acquiring token for user: {}", params.getUsername());
+            log.info("Attempting to acquire token using username/password for user: {}", params.getUsername());
 
-            // Acquire initial token
             if (acquireToken()) {
-                log.info("Successfully acquired token");
+                log.info("Successfully acquired token via username/password");
 
                 // Persist token
                 try {
@@ -112,27 +148,18 @@ public class TokenManager {
                 } catch (TokenStorageException e) {
                     log.error("Failed to persist token: {}", e.getMessage(), e);
                 }
+
                 // Start periodic renewal if enabled
                 if (params.isTokenRenewalEnabled()) {
                     startPeriodicRenewal();
                 } else {
                     log.info("Token auto-renewal is disabled (tokenRenewalEnabled=false)");
                 }
+
             } else {
-                log.error("Failed to acquire initial token");
-                // Fall back to token from token store if available
-                try {
-                    String stored = tokenStore != null ? tokenStore.readToken() : null;
-                    if (stored != null && !stored.isEmpty()) {
-                        currentToken.set(stored);
-                        log.info("Using token from token store (fallback)");
-                    } else {
-                        throw new IllegalStateException("Failed to acquire token and no fallback token available in token store");
-                    }
-                } catch (TokenStorageException e) {
-                    throw new IllegalStateException("Failed to acquire token and failed to read token store", e);
-                }
+                throw new IllegalStateException("Failed to acquire token using provided username/password and renewal with current token failed");
             }
+
         } else { // MANUAL
             // Manual mode - rely on token present in token store
             try {
@@ -449,6 +476,15 @@ public class TokenManager {
             log.error("Error extracting token from response: {}", e.getMessage(), e);
             return null;
         }
+    }
+
+    private static ObjectMapper createObjectMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        // support java.time types (Instant, LocalDateTime, etc.)
+        mapper.registerModule(new JavaTimeModule());
+        // ensure dates are serialized/deserialized as ISO-8601 strings, not numbers
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        return mapper;
     }
 }
 
