@@ -7,7 +7,9 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.illiad.proxy.config.Params;
 import com.illiad.proxy.config.TokenMode;
+import com.illiad.proxy.dto.Data;
 import com.illiad.proxy.dto.TokenGenerateRequest;
+import com.illiad.proxy.dto.TokenResponse;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -96,7 +98,7 @@ public class TokenManager {
      * Centralized POST to token/generate and parse into TokenHolder.
      * Ensures file writes happen on boundedElastic scheduler.
      */
-    private Mono<TokenHolder> postGenerate(byte[] requestBytes) {
+    private Mono<Data> postGenerate(byte[] requestBytes) {
         String uri = "https://" + params.getRemoteHost() + ":" + params.getRemotePort() + "/api/auth/token/generate";
         return client
                 .headers(headers -> headers.set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON))
@@ -108,8 +110,8 @@ public class TokenManager {
                                     int code = response.status().code();
                                     if (code >= 200 && code < 300) {
                                         try {
-                                            TokenHolder th = objMapper.readValue(body, TokenHolder.class);
-                                            return Mono.just(th);
+                                            TokenResponse tr = objMapper.readValue(body, TokenResponse.class);
+                                            return Mono.just(tr);
                                         } catch (JsonProcessingException e) {
                                             return Mono.error(e);
                                         }
@@ -119,10 +121,10 @@ public class TokenManager {
                                 })
                 )
                 // persist token to store on boundedElastic to avoid blocking reactor event loops
-                .flatMap(holder ->
+                .flatMap(tr ->
                         Mono.fromCallable(() -> {
-                            tokenStore.write(objMapper.writeValueAsString(holder));
-                            return holder;
+                            tokenStore.write(objMapper.writeValueAsString(tr.getData()));
+                            return tr.getData();
                         }).subscribeOn(Schedulers.boundedElastic())
                 );
     }
@@ -161,10 +163,13 @@ public class TokenManager {
 
                 try {
                     // block with a reasonable timeout so startup fails fast on misconfiguration
-                    TokenHolder holder = postGenerate(requestBytes)
+                    Data data = postGenerate(requestBytes)
                             .timeout(Duration.ofSeconds(10))
                             .block();
-                    current.set(Objects.requireNonNullElseGet(holder, TokenManager::emptyHolder));
+                    if (data != null) {
+                        TokenHolder holder = new TokenHolder(data);
+                        current.set(Objects.requireNonNullElseGet(holder, TokenManager::emptyHolder));
+                    }
                 } catch (Exception e) {
                     throw new IllegalStateException("Failed to acquire initial token", e);
                 }
@@ -178,7 +183,8 @@ public class TokenManager {
                     requestBytes = objMapper.writeValueAsBytes(req);
                     postGenerate(requestBytes)
                             .subscribeOn(Schedulers.boundedElastic())
-                            .subscribe(current::set, err -> log.error("Error acquiring token: {}", err.getMessage(), err));
+                            .subscribe(data -> current.set(new TokenHolder(data)),
+                                    err -> log.error("Error acquiring token: {}", err.getMessage(), err));
                 } catch (JsonProcessingException e) {
                     log.error("Failed to build token renewal request", e);
                 }
@@ -230,7 +236,7 @@ public class TokenManager {
                         req.setExpirationMinutes(params.getExpireMins());
                         byte[] requestBytes = objMapper.writeValueAsBytes(req);
                         return postGenerate(requestBytes)
-                                .doOnNext(current::set)
+                                .doOnNext(data -> current.set(new TokenHolder(data)))
                                 .onErrorResume(e -> {
                                     log.error("Error renewing token: {}", e.getMessage(), e);
                                     return Mono.empty();
