@@ -1,10 +1,11 @@
 package com.illiad.proxy.security;
 
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 public enum Cryptos {
+    JWT2("JWT2", (byte) 0x09, (short) 0),
     JWT("JWT", (byte) 0x07, (short) 0),
     SHA_224("SHA-224", (byte) 0x10, (short) 28),
     SHA_256("SHA-256", (byte) 0x20, (short) 32),
