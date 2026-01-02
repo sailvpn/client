@@ -1,5 +1,4 @@
 # python
-# File: `src/test/python/http_self_loop.py`
 #!/usr/bin/env python3
 import argparse
 import os
@@ -39,13 +38,13 @@ def probe_proxy_connect(proxy_url: str, target_host: str, target_port: int = 208
 
 def dump_response(resp):
     try:
-        print("Status:", resp.status_code)
-        print("Headers:")
+        print("Status:", resp.status_code, file=sys.stderr)
+        print("Headers:", file=sys.stderr)
         for k, v in resp.headers.items():
-            print(f"  {k}: {v}")
+            print(f"  {k}: {v}", file=sys.stderr)
         body = resp.text
-        print("\nBody preview (first 1000 chars):\n")
-        print(body[:1000])
+        print("\nBody preview (first 1000 chars):\n", file=sys.stderr)
+        print(body[:1000], file=sys.stderr)
     except Exception as e:
         print("Error dumping response:", repr(e), file=sys.stderr)
 
@@ -57,6 +56,15 @@ def make_request(session, url, verify, timeout, max_redirects):
         if resp.status_code == 307:
             loc = resp.headers.get("Location")
             print(f"[attempt {attempt}] 307 Location: {loc}", file=sys.stderr)
+            print(f"[attempt {attempt}] Dumping 307 response from proxy:", file=sys.stderr)
+            dump_response(resp)
+            # attempt to surface the raw status line if available
+            try:
+                orig = getattr(resp.raw, "_original_response", None)
+                if orig is not None:
+                    print(f"[attempt {attempt}] raw status line: {orig.status} {orig.reason}", file=sys.stderr)
+            except Exception:
+                pass
             if not loc:
                 raise RuntimeError("Received 307 but no Location header to follow")
             url = urljoin(url, loc)
