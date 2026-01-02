@@ -24,7 +24,7 @@ public class SecretImp implements Secret {
         // Check if crypto type is JWT
         Cryptos cryptoType = Cryptos.valueOf(params.getCrypto());
 
-        if (cryptoType == Cryptos.JWT) {
+        if (Cryptos.JWT2 == cryptoType || Cryptos.JWT == cryptoType) {
             // Get current token from token manager (may be dynamically renewed)
             String currentToken = tokenManager.getCurrentToken();
             if (currentToken == null || currentToken.isEmpty()) {
