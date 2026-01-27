@@ -10,6 +10,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.socksx.v5.Socks5CommandResponse;
 import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
+import io.netty.util.ReferenceCountUtil;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -74,7 +75,7 @@ public class Socks5AckHandler extends SimpleChannelInboundHandler<Socks5CommandR
                 if (uri.startsWith(bus.utils.HTTPS) || uri.startsWith(bus.utils.HTTP)) {
                     try {
                         URI parsed = new URI(uri);
-                        StringBuffer newUri = new StringBuffer(parsed.getRawPath());
+                        StringBuilder newUri = new StringBuilder(parsed.getRawPath());
                         if (newUri.isEmpty()) {
                             newUri.append(bus.utils.SLASH);
                         }
@@ -113,6 +114,7 @@ public class Socks5AckHandler extends SimpleChannelInboundHandler<Socks5CommandR
             bus.utils.closeOnFlush(ctx.channel());
         }
 
+        ReferenceCountUtil.release(initialReq);
     }
 }
 
