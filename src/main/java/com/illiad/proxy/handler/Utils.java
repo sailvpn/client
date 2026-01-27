@@ -151,25 +151,30 @@ public class Utils {
      * @return
      */
     public ByteBuf encodeReq(HttpRequest req) {
+        // HttpRequestEncoder handles both HttpRequest and FullHttpRequest
         EmbeddedChannel enc = new EmbeddedChannel(new HttpRequestEncoder());
         try {
-            enc.writeOutbound(req);
-
-            ByteBuf buf = Unpooled.buffer();
-            Object o;
-            while ((o = enc.readOutbound()) != null) {
-                if (o instanceof ByteBuf) {
-                    buf.writeBytes((ByteBuf) o);
-                    ((ByteBuf) o).release();
-                } else {
-                    // encoder should emit ByteBufs, but release any other reference-counted objects
-                    ReferenceCountUtil.release(o);
-                }
+            // writeOutbound returns true if it produced any output
+            if (!enc.writeOutbound(req)) {
+                return Unpooled.EMPTY_BUFFER;
             }
 
-            return buf;
+            ByteBuf composite = Unpooled.buffer();
+            Object msg;
+            while ((msg = enc.readOutbound()) != null) {
+                if (msg instanceof ByteBuf b) {
+                    composite.writeBytes(b);
+                    b.release(); // Important: release the chunk emitted by encoder
+                } else {
+                    ReferenceCountUtil.release(msg);
+                }
+            }
+            return composite;
         } finally {
-            enc.finish();
+            // This ensures the internal state of the encoder is cleaned up
+            enc.finishAndReleaseAll();
+            // IMPORTANT: The caller of encodeReq or this method must release 'req'
+            // if it's a FullHttpRequest to avoid leaks.
         }
     }
 
