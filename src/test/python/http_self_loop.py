@@ -92,7 +92,7 @@ def visit_with_urllib(url: str, proxy_url: str, cacert_path: str, is_https_targe
 def main():
     parser = argparse.ArgumentParser()
     # default changed to HTTP so the client does not attempt a direct TLS handshake to the proxy endpoint
-    parser.add_argument("--url", default="http://127.0.0.1:2080", help="Target URL (default: http://127.0.0.1:2080)")
+    parser.add_argument("--url", default="http://127.0.0.1:5001", help="Target URL (default: http://127.0.0.1:5001)")
     parser.add_argument("--proxy", default="127.0.0.1:9999", help="Local HTTP relay (host:port)")
     parser.add_argument("--cacert", default="./certs/ca.crt", help="Path to CA bundle (used only for HTTPS targets)")
     parser.add_argument("--insecure", action="store_true", help="Disable TLS verification for HTTPS targets")
@@ -105,7 +105,7 @@ def main():
     proxy_url = normalize_proxy(proxy_input)
 
     # diagnostic probe (optional)
-    probe_proxy_connect(proxy_url, "127.0.0.1", 2080)
+    probe_proxy_connect(proxy_url, "127.0.0.1", 5001)
 
     # resolve project-root relative default cacert
     script_dir = os.path.dirname(os.path.abspath(__file__))
