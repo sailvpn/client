@@ -2,6 +2,7 @@ package com.illiad.proxy.handler.v5;
 
 import com.illiad.proxy.ParamBus;
 import com.illiad.proxy.handler.Utils;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -19,12 +20,13 @@ public final class RelayHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-        if (relayChannel.isActive()) {
+        if (relayChannel.isActive() && msg instanceof ByteBuf) {
             relayChannel.writeAndFlush(msg);
         } else {
             ReferenceCountUtil.release(msg);
         }
     }
+
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
