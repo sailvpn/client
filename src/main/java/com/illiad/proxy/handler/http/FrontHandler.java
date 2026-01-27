@@ -14,6 +14,9 @@ import io.netty.handler.codec.socksx.v5.Socks5CommandType;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.ReferenceCountUtil;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+
 public class FrontHandler extends ChannelInboundHandlerAdapter {
 
     private final ParamBus bus;
@@ -28,27 +31,53 @@ public class FrontHandler extends ChannelInboundHandlerAdapter {
     public void channelRead(final ChannelHandlerContext ctx, Object msg) {
 
         if (msg instanceof HttpRequest httpReq) {
-
-            // Extract destination from the 'Host' header
-            String host = httpReq.headers().get(HttpHeaderNames.HOST);
-            if (host == null) {
+            String hostHeader = httpReq.headers().get(HttpHeaderNames.HOST);
+            if (hostHeader == null) {
                 ctx.close();
                 return;
             }
 
-            int port = httpReq.protocolVersion().equals(HttpVersion.HTTP_1_1) ? 80 : 443;
-            String[] hostParts = host.split(":");
-            String targetHost = hostParts[0];
-            if (hostParts.length > 1) {
-                port = Integer.parseInt(hostParts[1]);
+            String targetHost;
+            int port;
+
+            try {
+                // 1. Normalize the string so URI can parse it.
+                // If it doesn't have a scheme (e.g. "example.com"), we prepend "http://"
+                URI uri = hostHeader.contains("://")
+                        ? new URI(hostHeader)
+                        : new URI("http://" + hostHeader);
+
+                targetHost = uri.getHost();
+                port = uri.getPort();
+
+                // 2. Fallback for default ports
+                if (port == -1) {
+                    // Determine port by scheme or HTTP version
+                    boolean isSecure = hostHeader.startsWith("https") || httpReq.uri().startsWith("https");
+                    port = isSecure ? 443 : 80;
+                }
+
+                // 3. Safety check: ensure targetHost was successfully parsed
+                if (targetHost == null) {
+                    ctx.close();
+                    return;
+                }
+
+            } catch (URISyntaxException e) {
+                // Handle malformed host headers gracefully
+                ctx.close();
+                return;
             }
 
+            // 4. Create the SOCKS5 request
+            // targetHost from URI.getHost() automatically strips IPv6 brackets [ ]
             Socks5CommandRequest socksReq = new DefaultSocks5CommandRequest(
                     Socks5CommandType.CONNECT,
                     bus.utils.addressType(targetHost),
                     targetHost,
                     port
             );
+
 
             b.group(ctx.channel().eventLoop())
                     .channel(NioSocketChannel.class)
