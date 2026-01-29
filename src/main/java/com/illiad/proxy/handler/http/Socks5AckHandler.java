@@ -3,20 +3,17 @@ package com.illiad.proxy.handler.http;
 import com.illiad.proxy.ParamBus;
 import com.illiad.proxy.handler.v5.RelayHandler;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.codec.socksx.v5.Socks5CommandResponse;
-import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
-import io.netty.util.ReferenceCountUtil;
+import io.netty.handler.codec.socksx.v5.*;
+import io.netty.handler.ssl.SslHandler;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 
 /**
- * Handles the SOCKS5 command response acknowledgment and sets up the HTTP request forwarding or tunneling.
+ * Robust SOCKS5 Acknowledgment Handler.
+ * Fixes "Connection Reset" by ensuring pipeline atomic transitions.
  */
 public class Socks5AckHandler extends SimpleChannelInboundHandler<Socks5CommandResponse> {
 
@@ -33,88 +30,105 @@ public class Socks5AckHandler extends SimpleChannelInboundHandler<Socks5CommandR
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Socks5CommandResponse response) {
         if (response.status() == Socks5CommandStatus.SUCCESS) {
-
-            Channel frontend = frontendCtx.channel();
-            final ChannelPipeline frontendPipeline = frontend.pipeline();
             final Channel backend = ctx.channel();
-            final ChannelPipeline backendPipeline = backend.pipeline();
-            // setup Socks direct channel relay between frontend and backend
-            frontendPipeline.addLast(new RelayHandler(backend, bus));
-            backendPipeline.addLast(new RelayHandler(frontend, bus));
-            String prefix = bus.namer.getPrefix();
-            // remove all handlers except SslHandler, RelayHandler from backendPipeline
-            for (String name : backendPipeline.names()) {
-                if (name.startsWith(prefix)) {
-                    backendPipeline.remove(name);
-                }
-            }
+            final Channel frontend = frontendCtx.channel();
+            final String prefix = bus.namer.getPrefix();
 
-            // remove all handlers, except RelayHandler from frontendPipeline
-            for (String name : frontendPipeline.names()) {
-                if (name.startsWith(prefix)) {
-                    frontendPipeline.remove(name);
-                }
-            }
+            // 1. DYNAMICALLY PAUSE READS
+            // This prevents the OS from pumping new bytes (like TLS handshakes)
+            // into the pipeline while we are still modifying it.
+            frontend.config().setAutoRead(false);
+            backend.config().setAutoRead(false);
 
-            // If the original request was a CONNECT.
-            if (initialReq.method().equals(HttpMethod.CONNECT)) {
-                // no body, just flush the status then start raw relay (RelayHandler is in place)
-                // send 200 OK to frontend
-                ByteBuf responseBuf = bus.utils.encodeRes(
-                        new DefaultFullHttpResponse(
-                                HttpVersion.HTTP_1_1,
-                                HttpResponseStatus.valueOf(200, bus.utils.ESTABLISHED)
-                        ));
-                frontendCtx.writeAndFlush(responseBuf);
-
+            // 2. RESTRUCTURE PIPELINES
+            // For Backend: Add Relay AFTER SslHandler (residential) to handle decrypted data
+            if (backend.pipeline().get(SslHandler.class) != null) {
+                backend.pipeline().addAfter(
+                        backend.pipeline().context(SslHandler.class).name(),
+                        "relay-to-frontend",
+                        new RelayHandler(frontend, bus)
+                );
             } else {
+                backend.pipeline().addFirst("relay-to-frontend", new RelayHandler(frontend, bus));
+            }
 
-                // For normal HTTP requests: convert proxy-style absolute-URI to origin-form if needed,
-                // strip proxy-specific headers, and forward the request.
-                String uri = initialReq.uri();
-                if (uri.startsWith(bus.utils.HTTPS) || uri.startsWith(bus.utils.HTTP)) {
-                    try {
-                        URI parsed = new URI(uri);
-                        StringBuilder newUri = new StringBuilder(parsed.getRawPath());
-                        if (newUri.isEmpty()) {
-                            newUri.append(bus.utils.SLASH);
-                        }
-                        String query = parsed.getRawQuery();
-                        if (query != null) {
-                            newUri.append(bus.utils.QUESTION).append(query);
-                        }
-                        // setUri is available on Netty's HttpRequest implementations
-                        initialReq.setUri(newUri.toString());
-                    } catch (URISyntaxException ignore) {
-                        // leave original uri if parsing fails
-                    }
-                }
+            // For Frontend: Add Relay at the front (no residential handlers usually)
+            frontend.pipeline().addFirst("relay-to-backend", new RelayHandler(backend, bus));
 
-                // remove proxy headers that should not be forwarded to origin
-                HttpHeaders headers = initialReq.headers();
-                headers.remove(bus.utils.PROXY_AUTHORIZATION);
-                headers.remove(bus.utils.PROXY_AUTHENTICATE);
-                headers.remove(bus.utils.PROXY_CONNECTION);
-                // keep Host header as-is for origin server
+            // 3. REMOVE TRANSIENT HANDLERS (HttpServerCodec, Aggregator, etc.)
+            // We do this BEFORE flushing the 200 OK or forwarding the request.
+            cleanupPipeline(frontend.pipeline(), prefix);
+            cleanupPipeline(backend.pipeline(), prefix);
 
-                ByteBuf encodedReq = bus.utils.encodeReq(initialReq);
-                backend.writeAndFlush(encodedReq);
+            // 4. SIGNAL & RESUME
+            if (initialReq.method().equals(HttpMethod.CONNECT)) {
+                handleHttpsEstablished(frontend, backend);
+            } else {
+                handleHttpForwarding(frontend, backend);
             }
 
         } else {
-            // send error response to frontend
-            ByteBuf errorBuf = bus.utils.encodeRes(
-                    new DefaultFullHttpResponse(
-                            HttpVersion.HTTP_1_1,
-                            HttpResponseStatus.valueOf(502, response.status().toString())
-                    ));
-            frontendCtx.writeAndFlush(errorBuf);
-            frontendCtx.fireExceptionCaught(new Exception(response.status().toString()));
-            bus.utils.closeOnFlush(frontendCtx.channel());
-            bus.utils.closeOnFlush(ctx.channel());
+            handleSocksFailure(ctx, response);
         }
+    }
 
-        ReferenceCountUtil.release(initialReq);
+    private void handleHttpsEstablished(Channel frontend, Channel backend) {
+        // Send '200 Connection Established' to the client
+        ByteBuf ok = bus.utils.encodeRes(new DefaultFullHttpResponse(
+                HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(200, bus.utils.ESTABLISHED)));
+
+        frontend.writeAndFlush(ok).addListener(f -> {
+            // Re-enable reads once the pipe is clear and the signal is out
+            resume(frontend, backend);
+        });
+    }
+
+    private void handleHttpForwarding(Channel frontend, Channel backend) {
+        // Normalize the URI from Absolute to Origin form
+        normalizeUri(initialReq);
+
+        // remove proxy headers that should not be forwarded to origin
+        HttpHeaders headers = initialReq.headers();
+        headers.remove(bus.utils.PROXY_AUTHORIZATION);
+        headers.remove(bus.utils.PROXY_AUTHENTICATE);
+        headers.remove(bus.utils.PROXY_CONNECTION);
+        // keep Host header as-is for origin server
+
+        // Forward the request (Assumes HttpObjectAggregator was used in Starter)
+        ByteBuf encodedReq = bus.utils.encodeReq(initialReq);
+        backend.writeAndFlush(encodedReq).addListener(f -> resume(frontend, backend));
+    }
+
+    private void normalizeUri(HttpRequest req) {
+        String uri = req.uri();
+        if (uri.startsWith("http://") || uri.startsWith("https://")) {
+            try {
+                URI p = new URI(uri);
+                String path = (p.getRawPath() == null || p.getRawPath().isEmpty()) ? "/" : p.getRawPath();
+                if (p.getRawQuery() != null) path += "?" + p.getRawQuery();
+                req.setUri(path);
+            } catch (URISyntaxException ignored) {
+            }
+        }
+    }
+
+    private void cleanupPipeline(ChannelPipeline p, String prefix) {
+        // Safe removal loop using your namer convention
+        p.names().stream()
+                .filter(name -> name.startsWith(prefix))
+                .forEach(p::remove);
+    }
+
+    private void resume(Channel f, Channel b) {
+        f.config().setAutoRead(true);
+        b.config().setAutoRead(true);
+    }
+
+    private void handleSocksFailure(ChannelHandlerContext ctx, Socks5CommandResponse res) {
+        ByteBuf err = bus.utils.encodeRes(new DefaultFullHttpResponse(
+                HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY));
+        frontendCtx.writeAndFlush(err).addListener(ChannelFutureListener.CLOSE);
+        ctx.close();
     }
 }
 
