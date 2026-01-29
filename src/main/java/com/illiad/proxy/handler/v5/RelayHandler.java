@@ -27,17 +27,12 @@ public final class RelayHandler extends ChannelInboundHandlerAdapter {
         }
     }
 
-
-    @Override
-    public void channelInactive(ChannelHandlerContext ctx) {
-        if (relayChannel.isActive()) {
-            bus.utils.closeOnFlush(relayChannel);
-        }
-    }
-
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         ctx.fireExceptionCaught(cause);
+        if (relayChannel != null && relayChannel.isActive()) {
+            relayChannel.flush().close();
+        }
         ctx.close();
     }
 }
