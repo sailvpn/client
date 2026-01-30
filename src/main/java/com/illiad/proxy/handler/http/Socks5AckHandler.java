@@ -7,6 +7,7 @@ import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.socksx.v5.*;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.ReferenceCountUtil;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -70,6 +71,8 @@ public class Socks5AckHandler extends SimpleChannelInboundHandler<Socks5CommandR
         } else {
             handleSocksFailure(ctx, response);
         }
+
+        ReferenceCountUtil.release(initialReq);
     }
 
     private void handleHttpsEstablished(Channel frontend, Channel backend) {
