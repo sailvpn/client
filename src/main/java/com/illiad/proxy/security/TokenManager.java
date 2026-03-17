@@ -10,6 +10,7 @@ import com.illiad.proxy.config.TokenMode;
 import com.illiad.proxy.dto.Data;
 import com.illiad.proxy.dto.TokenGenerateRequest;
 import com.illiad.proxy.dto.TokenResponse;
+import io.jsonwebtoken.*;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -36,11 +37,11 @@ public class TokenManager {
     private final HttpClient client;
     private final TokenStore tokenStore;
     private volatile boolean running = false;
-    private final AtomicReference<TokenHolder> current = new AtomicReference<>();
+    private final AtomicReference<String> current = new AtomicReference<>();
     private volatile Disposable renewDisposable;
 
     @Autowired
-    public TokenManager(Params params, HttpClient client) throws TokenStorageException, JsonProcessingException {
+    public TokenManager(Params params, HttpClient client) throws TokenStorageException {
         this.params = params;
         this.client = client;
 
@@ -63,13 +64,7 @@ public class TokenManager {
         }
 
         // Load existing token holder from store if present (off main reactor threads)
-        String stored = tokenStore.read();
-        if (stored == null || stored.isEmpty()) {
-            current.set(emptyHolder());
-        } else {
-            TokenHolder holder = objMapper.readValue(stored, TokenHolder.class);
-            current.set(Objects.requireNonNullElseGet(holder, TokenManager::emptyHolder));
-        }
+        current.set(tokenStore.read());
     }
 
     // package-private constructor for tests
@@ -77,15 +72,14 @@ public class TokenManager {
         this.params = params;
         this.client = client;
         this.tokenStore = store;
-        this.current.set(emptyHolder());
+        this.current.set(null);
+    }
+    
+    
+    public String getCurrentToken() {
+        return current.get();
     }
 
-    private static TokenHolder emptyHolder() {
-        TokenHolder h = new TokenHolder();
-        h.setToken(null);
-        h.setExpiresAt(Instant.EPOCH);
-        return h;
-    }
 
     private static ObjectMapper createObjectMapper() {
         ObjectMapper mapper = new ObjectMapper();
@@ -148,8 +142,9 @@ public class TokenManager {
         if (TokenMode.AUTO == mode) {
             log.info("Automatic token mode enabled (tokenMode=auto)");
 
+            Instant  expiresAt = getExpireEpochMilli();
             // If no token present or expired => try to acquire via username/password synchronously (fail fast)
-            if (current.get().isExpired()) {
+            if (Instant.now().isAfter(expiresAt)) {
                 if (params.getUsername() == null || params.getUsername().isEmpty() ||
                         params.getPassword() == null || params.getPassword().isEmpty()) {
                     throw new IllegalStateException("Automatic token mode requires username/password when no valid token is available");
@@ -167,23 +162,22 @@ public class TokenManager {
                             .timeout(Duration.ofSeconds(10))
                             .block();
                     if (data != null) {
-                        TokenHolder holder = new TokenHolder(data);
-                        current.set(Objects.requireNonNullElseGet(holder, TokenManager::emptyHolder));
+                       current.set(data.getToken());
                     }
                 } catch (Exception e) {
                     throw new IllegalStateException("Failed to acquire initial token", e);
                 }
-            } else if (Duration.between(Instant.now(), current.get().getExpiresAt()).toMinutes() < params.getRenewInterval() * 5L) {
+            } else if (Duration.between(Instant.now(), expiresAt).toMinutes() < params.getRenewInterval() * 5L) {
                 // Proactively renew once at startup if close to expiry; do this asynchronously (don't block startup)
                 TokenGenerateRequest req = new TokenGenerateRequest();
-                req.setCurrentToken(current.get().getToken());
+                req.setCurrentToken(current.get());
                 req.setExpirationMinutes(params.getExpireMins());
                 byte[] requestBytes;
                 try {
                     requestBytes = objMapper.writeValueAsBytes(req);
                     postGenerate(requestBytes)
                             .subscribeOn(Schedulers.boundedElastic())
-                            .subscribe(data -> current.set(new TokenHolder(data)),
+                            .subscribe(data -> current.set(data.getToken()),
                                     err -> log.error("Error acquiring token: {}", err.getMessage(), err));
                 } catch (JsonProcessingException e) {
                     log.error("Failed to build token renewal request", e);
@@ -200,11 +194,7 @@ public class TokenManager {
                                     "Please create the token file with the proxy server token."
                     );
                 }
-                TokenHolder holder = objMapper.readValue(stored, TokenHolder.class);
-                if (holder == null || holder.getToken() == null || holder.getToken().isEmpty()) {
-                    throw new IllegalStateException("Manual mode token file does not contain a valid token");
-                }
-                current.set(holder);
+                current.set(stored);
                 log.info("Manual token mode enabled (tokenMode=manual)");
                 log.info("Using token from token store");
                 log.info("Auto-renewal is DISABLED in manual mode");
@@ -232,11 +222,11 @@ public class TokenManager {
                 .flatMap(tick -> {
                     try {
                         TokenGenerateRequest req = new TokenGenerateRequest();
-                        req.setCurrentToken(current.get().getToken());
+                        req.setCurrentToken(current.get());
                         req.setExpirationMinutes(params.getExpireMins());
                         byte[] requestBytes = objMapper.writeValueAsBytes(req);
                         return postGenerate(requestBytes)
-                                .doOnNext(data -> current.set(new TokenHolder(data)))
+                                .doOnNext(data -> current.set(data.getToken()))
                                 .onErrorResume(e -> {
                                     log.error("Error renewing token: {}", e.getMessage(), e);
                                     return Mono.empty();
@@ -259,13 +249,33 @@ public class TokenManager {
         }
     }
 
-    /**
-     * Get the current token string
-     */
-    public String getCurrentToken() {
-        TokenHolder holder = current.get();
-        if (holder == null) return null;
-        return holder.getToken();
+
+    private Instant getExpireEpochMilli() {
+        Claims claims = parseJWT(current.get());
+        if (claims != null) {
+            Long expiresAt = claims.get("expiresAt", Long.class);
+            if (expiresAt != null) {
+                return Instant.ofEpochMilli(expiresAt);
+            }
+        }
+        return Instant.EPOCH; // treat as expired if we can't parse
     }
+
+    private static Claims parseJWT(String jwtString) {
+        if (jwtString != null) {
+            // Standard JJWT trick: remove signature to treat as unsecured
+            int i = jwtString.lastIndexOf('.');
+            if (i > 0) {
+                String withoutSignature = jwtString.substring(0, i + 1);
+                return Jwts.parser()
+                        .unsecured() // Explicitly tell the parser to allow unsigned JWTs
+                        .build()
+                        .parseUnsecuredClaims(withoutSignature)
+                        .getPayload();
+            }
+        }
+        return null;
+    }
+
 }
 
