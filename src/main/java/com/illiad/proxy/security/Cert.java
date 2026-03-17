@@ -2,6 +2,7 @@ package com.illiad.proxy.security;
 
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
@@ -23,8 +24,8 @@ import java.util.Collection;
 public class Cert {
     // Netty client SSL context (trusts only the configured proxy certificate)
     public final SslContext sslCtx;
-    // JSSE SSLContext for DTLS/TLS (uses same trust material)
-    public final SSLContext dtlsCtx;
+
+    public final SslContext dtlsCtx;
 
     public Cert(@Value("${proxy.ssl.cert-path:${PROXY_CERT_PATH:./certs/ca.crt}}") Resource certResource) throws Exception {
         // Resolve resource: allow Spring Resource or fallback to path(s)
@@ -69,19 +70,20 @@ public class Cert {
         tmf.init(trustKs);
         TrustManager[] trustManagers = tmf.getTrustManagers();
 
-        // Build Netty client SslContext trusting only the configured certificate(s)
+        // 1. Build standard TCP SslContext
         this.sslCtx = SslContextBuilder.forClient()
                 .trustManager(tmf)
+                .sslProvider(SslProvider.OPENSSL) // Match the server's provider
+                .protocols("TLSv1.2", "TLSv1.3")  // Explicitly allow both
                 .build();
 
-        // Build JSSE SSLContext for DTLS
-        try {
-            dtlsCtx = SSLContext.getInstance("DTLS");
-            dtlsCtx.init(null, trustManagers, new java.security.SecureRandom());
-        } catch (Exception ex) {
-            // If both fail, surface a clear exception
-            throw new RuntimeException("Failed to initialize JSSE SSLContext for DTLS", ex);
-        }
+        // 2. Build OpenSSL-backed DTLS SslContext (kept for Netty/OpenSSL usage)
+        this.dtlsCtx = SslContextBuilder.forClient()
+                .trustManager(tmf)
+                .sslProvider(SslProvider.OPENSSL)
+                .protocols("TLSv1.2")
+                .build();
+
     }
 
 }
