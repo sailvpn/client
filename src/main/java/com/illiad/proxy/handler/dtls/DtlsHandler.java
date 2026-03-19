@@ -16,6 +16,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 
 import static javax.net.ssl.SSLEngineResult.HandshakeStatus.*;
@@ -65,18 +66,16 @@ public class DtlsHandler extends ChannelDuplexHandler {
     @Override
     public void handlerAdded(final ChannelHandlerContext ctx) {
         this.context = ctx;
-        // 1. Get the Netty SslContext (configured by OpenSSL provider and DTLS)
-        // 2. Create the SSLEngine (Netty's engine implements javax.net.ssl.SSLEngine). This engine will use native OpenSSL under the hood!
-        sslEngine = bus.cert.dtlsCtx.newEngine(ctx.alloc(), remoteAddress.getHostString(), remoteAddress.getPort());
+        sslEngine = bus.cert.dtlsCtx.createSSLEngine(remoteAddress.getHostString(), remoteAddress.getPort());
+        sslEngine.setUseClientMode(true);
         try {
             // Start DTLS handshake
             sslEngine.beginHandshake();
-            sendHandshake();
+            initHandshake();
         } catch (SSLException e) {
             context.fireExceptionCaught(e);
         }
 
-        /*
         // Add handshake timeout
         ctx.executor().schedule(() -> {
             if (!handshakePromise.isDone()) {
@@ -87,11 +86,10 @@ public class DtlsHandler extends ChannelDuplexHandler {
             }
         }, 30, TimeUnit.SECONDS);
 
-         */
 
     }
 
-    private void sendHandshake() {
+    private void initHandshake() {
 
         synchronized (outboundLock) {
             try {
@@ -257,7 +255,6 @@ public class DtlsHandler extends ChannelDuplexHandler {
                             }
                         });
                     }
-                    return; // Exit the current loop; it will resume once tasks finish
                 }
 
                 hsStatus = sslEngine.getHandshakeStatus();

@@ -1,5 +1,6 @@
 package com.illiad.proxy.security;
 
+import io.netty.handler.ssl.OpenSslContextOption;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
@@ -25,7 +26,7 @@ public class Cert {
     // Netty client SSL context (trusts only the configured proxy certificate)
     public final SslContext sslCtx;
 
-    public final SslContext dtlsCtx;
+    public final SSLContext dtlsCtx;
 
     public Cert(@Value("${proxy.ssl.cert-path:${PROXY_CERT_PATH:./certs/ca.crt}}") Resource certResource) throws Exception {
         // Resolve resource: allow Spring Resource or fallback to path(s)
@@ -77,12 +78,9 @@ public class Cert {
                 .protocols("TLSv1.2", "TLSv1.3")  // Explicitly allow both
                 .build();
 
-        // 2. Build OpenSSL-backed DTLS SslContext (kept for Netty/OpenSSL usage)
-        this.dtlsCtx = SslContextBuilder.forClient()
-                .trustManager(tmf)
-                .sslProvider(SslProvider.OPENSSL)
-                .protocols("TLSv1.2")
-                .build();
+        // 2. Create the DTLS Context using JSSE provider
+        this.dtlsCtx = SSLContext.getInstance("DTLS");
+        dtlsCtx.init(null, trustManagers, null);
 
     }
 
