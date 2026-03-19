@@ -15,7 +15,7 @@ public class Params {
     int remotePort = Integer.parseInt(System.getProperty("remotePort", "5001"));
     String udpHost = System.getProperty("udpHost", "127.0.0.1");
     // crypto name as defined in Cryptos
-    String crypto = System.getProperty("crypto", "JWT2");
+    String crypto = System.getProperty("crypto", "SHA_256");
     int min = 1;
     int max = 64; // important, maximum value 128
     String secret = "password";
