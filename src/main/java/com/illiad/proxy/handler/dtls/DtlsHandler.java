@@ -4,10 +4,7 @@ import com.illiad.proxy.ParamBus;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.channel.socket.DatagramPacket;
-import io.netty.util.concurrent.DefaultPromise;
-import io.netty.util.concurrent.EventExecutor;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.Promise;
+import io.netty.util.concurrent.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +44,7 @@ public class DtlsHandler extends ChannelDuplexHandler {
     private volatile ChannelHandlerContext context;
     private final Object inboundLock = new Object();
     private final Object outboundLock = new Object();
+    private ScheduledFuture<?> timeoutFuture;
 
     public DtlsHandler(ParamBus bus, InetSocketAddress remoteAddress) {
         this.bus = bus;
@@ -66,7 +64,8 @@ public class DtlsHandler extends ChannelDuplexHandler {
     @Override
     public void handlerAdded(final ChannelHandlerContext ctx) {
         this.context = ctx;
-        sslEngine = bus.cert.dtlsCtx.createSSLEngine(remoteAddress.getHostString(), remoteAddress.getPort());
+        // TODO: domain name rather than ip address in prdocution release
+        sslEngine = bus.cert.dtlsCtx.createSSLEngine("example.test", remoteAddress.getPort());
         sslEngine.setUseClientMode(true);
         try {
             // Start DTLS handshake
@@ -77,7 +76,7 @@ public class DtlsHandler extends ChannelDuplexHandler {
         }
 
         // Add handshake timeout
-        ctx.executor().schedule(() -> {
+        timeoutFuture = ctx.executor().schedule(() -> {
             if (!handshakePromise.isDone()) {
                 SSLException timeout = new SSLHandshakeException("DTLS handshake timeout");
                 handshakePromise.setFailure(timeout);
@@ -268,8 +267,14 @@ public class DtlsHandler extends ChannelDuplexHandler {
                     netinWriteMode = true;
                 }
 
-                logger.info("DTLS handshake completed for channel {}", context.channel());
-                handshakePromise.setSuccess(context.channel());
+                // Safe for multiple calls
+                if (handshakePromise.trySuccess(context.channel())) {
+                    logger.info("DTLS handshake completed for channel {}", context.channel());
+                    // Cancel the timeout task here if you have one
+                    if (timeoutFuture != null) {
+                        timeoutFuture.cancel(false);
+                    }
+                }
             }
 
         } catch (SSLException e) {
