@@ -75,7 +75,6 @@ public class Starter {
                     @Override
                     protected void initChannel(NioSocketChannel ch) {
                         ChannelPipeline pipeline = ch.pipeline();
-                        pipeline.addLast(new LoggingHandler(LogLevel.INFO));
                         pipeline.addLast(bus.namer.generateName(), bus.v5ServerEncoder);
                         pipeline.addLast(bus.namer.generateName(), new V5InitReqDecoder());
                         pipeline.addLast(bus.namer.generateName(), new V5CommandHandler(bus));
