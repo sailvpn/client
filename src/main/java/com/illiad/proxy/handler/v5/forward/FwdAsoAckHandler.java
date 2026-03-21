@@ -10,8 +10,6 @@ import io.netty.channel.socket.DatagramPacket;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.handler.codec.socksx.v5.Socks5CommandResponse;
 import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
 import io.netty.util.ReferenceCountUtil;
 
 import java.net.InetSocketAddress;
@@ -65,8 +63,7 @@ public class FwdAsoAckHandler extends SimpleChannelInboundHandler<Socks5CommandR
                                 Channel fwdUdpChannel = future.channel();
                                 DtlsHandler dtlsHandler = new DtlsHandler(bus, (InetSocketAddress) fwdUdpChannel.remoteAddress());
 
-                                fwdUdpChannel.pipeline().addLast(new LoggingHandler(LogLevel.INFO))
-                                        .addLast(dtlsHandler);
+                                fwdUdpChannel.pipeline().addLast(dtlsHandler);
                                 dtlsHandler.handshakeFuture().addListener(future1 -> {
                                     if (future1.isSuccess()) {
                                         // Successfully completed DTLS handshake
