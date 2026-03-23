@@ -11,6 +11,8 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.*;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -25,12 +27,17 @@ import static javax.net.ssl.SSLEngineResult.HandshakeStatus.*;
 public class DtlsHandler extends ChannelDuplexHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(DtlsHandler.class);
+    // set buffer size to 1310720 (65536*20) to ensure that buffer limit can never be equal to buffer capacity in read mode
+    // this is how we decide if a buffer is in read mode (limit < capacity), or in write mode (limit == capacity)
+    private static final int NET_OUT_SIZE = 1310720;
+    private static final int NET_IN_SIZE = 1310720;
+    private static final int APP_IN_SIZE = 1310720;
+    private static final int FRAGMENT_SIZE = 1300;
+    private final ParamBus bus;
     // Define a separate thread pool for blocking SSL tasks
     private static final ExecutorService sslTaskExecutor = Executors.newCachedThreadPool();
 
-    private final ParamBus bus;
     private SSLEngine sslEngine;
-    private final InetSocketAddress remoteAddress;
     // Buffer mode tracking: true = write mode, false = read mode
     private final ByteBuffer netin;
     private final ByteBuffer appin;
@@ -46,12 +53,11 @@ public class DtlsHandler extends ChannelDuplexHandler {
     private final Object outboundLock = new Object();
     private ScheduledFuture<?> timeoutFuture;
 
-    public DtlsHandler(ParamBus bus, InetSocketAddress remoteAddress) {
+    public DtlsHandler(ParamBus bus) {
         this.bus = bus;
-        this.remoteAddress = remoteAddress;
-        this.netin = ByteBuffer.allocate(bus.utils.NET_IN_SIZE);
-        this.appin = ByteBuffer.allocate(bus.utils.APP_IN_SIZE);
-        this.netout = ByteBuffer.allocate(bus.utils.NET_OUT_SIZE);
+        this.netin = ByteBuffer.allocate(NET_IN_SIZE);
+        this.appin = ByteBuffer.allocate(APP_IN_SIZE);
+        this.netout = ByteBuffer.allocate(NET_OUT_SIZE);
         this.emptyBuffer = ByteBuffer.allocate(0);
     }
 
@@ -64,8 +70,15 @@ public class DtlsHandler extends ChannelDuplexHandler {
     @Override
     public void handlerAdded(final ChannelHandlerContext ctx) {
         this.context = ctx;
-        // TODO: domain name rather than ip address in prdocution release
-        sslEngine = bus.cert.dtlsCtx.createSSLEngine("example.test", remoteAddress.getPort());
+        sslEngine = bus.cert.dtlsCtx.createSSLEngine();
+        // Create list for SNI and set it on the SSL engine
+        List<SNIServerName> serverNames = new ArrayList<>(1);
+        serverNames.add(new SNIHostName(bus.params.getSNI()));
+        // Apply to SSLParameters
+        SSLParameters params = sslEngine.getSSLParameters();
+        params.setServerNames(serverNames);
+        sslEngine.setSSLParameters(params);
+
         sslEngine.setUseClientMode(true);
         try {
             // Start DTLS handshake
@@ -334,7 +347,7 @@ public class DtlsHandler extends ChannelDuplexHandler {
         }
 
         while (netout.hasRemaining()) {
-            int fragmentSize = Math.min(netout.remaining(), bus.utils.FRAGMENT_SIZE);
+            int fragmentSize = Math.min(netout.remaining(), FRAGMENT_SIZE);
             // ✅ Use ByteBuffer slice for zero-copy view
             ByteBuffer slice = netout.slice();
             slice.limit(fragmentSize);
