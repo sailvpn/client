@@ -71,14 +71,18 @@ public class DtlsHandler extends ChannelDuplexHandler {
     public void handlerAdded(final ChannelHandlerContext ctx) {
         this.context = ctx;
         sslEngine = bus.cert.dtlsCtx.createSSLEngine();
-        // Create list for SNI and set it on the SSL engine
-        List<SNIServerName> serverNames = new ArrayList<>(1);
-        serverNames.add(new SNIHostName(bus.params.getSNI()));
-        // Apply to SSLParameters
-        SSLParameters params = sslEngine.getSSLParameters();
-        params.setServerNames(serverNames);
-        sslEngine.setSSLParameters(params);
 
+        String sni = bus.params.getSNI();
+        if (sni != null && !sni.isEmpty()) {
+            // Create list for SNI and set it on the SSL engine
+            List<SNIServerName> serverNames = new ArrayList<>(1);
+            serverNames.add(new SNIHostName(sni));
+
+            // Apply to SSLParameters
+            SSLParameters params = sslEngine.getSSLParameters();
+            params.setServerNames(serverNames);
+            sslEngine.setSSLParameters(params);
+        }
         sslEngine.setUseClientMode(true);
         try {
             // Start DTLS handshake
