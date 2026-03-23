@@ -12,6 +12,7 @@ public class Params {
     String localHost = System.getProperty("localHost", "127.0.0.1");
     int httpPort = Integer.parseInt(System.getProperty("httpPort", "9999"));
     String remoteHost = System.getProperty("remoteHost", "127.0.0.1");
+    String SNI = System.getProperty("SNI", "example.test");
     int remotePort = Integer.parseInt(System.getProperty("remotePort", "5001"));
     String udpHost = System.getProperty("udpHost", "127.0.0.1");
     // crypto name as defined in Cryptos
