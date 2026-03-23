@@ -61,7 +61,7 @@ public class FwdAsoAckHandler extends SimpleChannelInboundHandler<Socks5CommandR
                             if (future.isSuccess()) {
                                 // The connection was successful, and the channel is now active.
                                 Channel fwdUdpChannel = future.channel();
-                                DtlsHandler dtlsHandler = new DtlsHandler(bus, (InetSocketAddress) fwdUdpChannel.remoteAddress());
+                                DtlsHandler dtlsHandler = new DtlsHandler(bus);
 
                                 fwdUdpChannel.pipeline().addLast(dtlsHandler);
                                 dtlsHandler.handshakeFuture().addListener(future1 -> {
