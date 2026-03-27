@@ -28,8 +28,7 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
     @Override
     public void channelRead0(final ChannelHandlerContext ctx, final Socks5CommandRequest request) {
 
-        Bootstrap udpBootstrap = new Bootstrap();
-        udpBootstrap.group(ctx.channel().eventLoop())
+        new Bootstrap().group(ctx.channel().eventLoop().parent())
                 .channel(NioDatagramChannel.class)
                 // Enable broadcasting if needed
                 .option(ChannelOption.SO_BROADCAST, true)

@@ -12,8 +12,6 @@ import io.netty.handler.ssl.SslHandler;
 public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandRequest> {
 
     private final ParamBus bus;
-    private final Bootstrap b = new Bootstrap();
-
     public V5ConnectHandler(ParamBus bus) {
         this.bus = bus;
     }
@@ -21,7 +19,7 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
     @Override
     public void channelRead0(final ChannelHandlerContext ctx, final Socks5CommandRequest request) {
 
-        b.group(ctx.channel().eventLoop())
+        new Bootstrap().group(ctx.channel().eventLoop().parent())
                 .channel(NioSocketChannel.class)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
                 .option(ChannelOption.SO_KEEPALIVE, true)
