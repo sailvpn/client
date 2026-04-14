@@ -8,35 +8,32 @@ import lombok.Data;
 @ConfigurationProperties("params")
 @Data
 public class Params {
-    int localPort = Integer.parseInt(System.getProperty("localPort", "3080"));
-    String localHost = System.getProperty("localHost", "127.0.0.1");
-    int httpPort = Integer.parseInt(System.getProperty("httpPort", "9999"));
-    String remoteHost = System.getProperty("remoteHost", "127.0.0.1");
-    String SNI = System.getProperty("SNI", "example.test");
-    int remotePort = Integer.parseInt(System.getProperty("remotePort", "5001"));
-    String udpHost = System.getProperty("udpHost", "127.0.0.1");
+    // Default values are set directly; Spring overrides them if found in a config file
+    private int localPort = 3080;
+    private String localHost = "127.0.0.1";
+    private int httpPort = 9999;
+    private String remoteHost = "127.0.0.1";
+    private String sni = "example.test";
+    private int remotePort = 5001;
+    private String udpHost = "127.0.0.1";
     // crypto name as defined in Cryptos
-    String crypto = System.getProperty("crypto", "SHA_256");
-    int min = 1;
-    int max = 64; // important, maximum value 128
+    private String crypto = "SHA_256";
+    private int min = 1;
+    private int max = 64; // important, maximum value 128
     String secret = "password";
 
     // NOTE: in-memory jwtToken removed to avoid embedding secrets in configuration objects.
-    // The client must use a TokenStore implementation (e.g. FileTokenStore) to load/save tokens
-    // from a file on disk. This path can be configured via params.jwtTokenFile, system property
-    // -DjwtTokenFile=... or environment variable JWT_TOKEN_FILE.
-
-    // JWT token file path: can be set via application.properties (params.jwtTokenFile)
-    // or overridden via JVM system property -DjwtTokenFile=... or environment JWT_TOKEN_FILE
-    String jwtTokenFile = System.getProperty("jwtTokenFile", System.getenv("JWT_TOKEN_FILE") != null ? System.getenv("JWT_TOKEN_FILE") : "./troad_token.jwt");
+    // The client must use a TokenStore implementation (e.g. FileTokenStore) to load/save tokens as needed,
+    // and TokenManager to manage token lifecycle (acquisition/renewal).
+    private String jwtTokenFile = "./troad_token.jwt";
 
     // JWT auto-acquisition settings
-    String username = System.getProperty("username", "");
-    String password = System.getProperty("password", "");
-    Long expireMins = Long.parseLong(System.getProperty("expireMins", "43200")); // 30 days default
+    private String username = "";
+    private String password = "";
+    private Long expireMins = 43200L; // 30 days default
 
     // JWT token mode: use TokenMode enum instead of raw string
-    String tokenMode = System.getProperty("tokenMode", "MANUAL"); // kept as raw property for Spring binding/backwards compatibility
+    private String tokenMode = "MANUAL"; // kept as raw property for Spring binding/backwards compatibility
     // JWT auto-renewal settings
-    Long renewInterval = Long.parseLong(System.getProperty("renewInterval", "30")); // 30 minutes default
+    private Long renewInterval = 30L; // 30 minutes default
 }
