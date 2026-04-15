@@ -73,15 +73,18 @@ public class DtlsHandler extends ChannelDuplexHandler {
         sslEngine = bus.cert.dtlsCtx.createSSLEngine();
 
         String sni = bus.params.getSni();
-        if (sni != null && !sni.isEmpty()) {
-            // must create list for SNI and set it on the SSL engin, when no hostname is provided
-            List<SNIServerName> serverNames = new ArrayList<>(1);
-            serverNames.add(new SNIHostName(sni));
-            // Apply to SSLParameters
-            SSLParameters params = sslEngine.getSSLParameters();
-            params.setServerNames(serverNames);
-            sslEngine.setSSLParameters(params);
+        if (sni == null || sni.isEmpty()) {
+            // remote host as the last resort
+            sni = bus.params.getRemoteHost();
         }
+        // must create list for SNI and set it on the SSL engin, when no hostname is provided
+        List<SNIServerName> serverNames = new ArrayList<>(1);
+        serverNames.add(new SNIHostName(sni));
+        // Apply to SSLParameters
+        SSLParameters params = sslEngine.getSSLParameters();
+        params.setServerNames(serverNames);
+        sslEngine.setSSLParameters(params);
+
 
         sslEngine.setUseClientMode(true);
         try {

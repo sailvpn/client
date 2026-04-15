@@ -33,7 +33,11 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                 .addListener((ChannelFutureListener) future -> {
                     if (future.isSuccess()) {
                         Channel ch = future.channel();
-                        SslHandler sslHandler = bus.cert.sslCtx.newHandler(ch.alloc(), bus.params.getRemoteHost(), bus.params.getRemotePort());
+                        String sni = bus.params.getSni();
+                        if (sni == null || sni.isEmpty()) {
+                            sni = bus.params.getRemoteHost();
+                        }
+                        SslHandler sslHandler = bus.cert.sslCtx.newHandler(ch.alloc(), sni, bus.params.getRemotePort());
                         ChannelPipeline pipeline = ch.pipeline();
                         pipeline.addLast(sslHandler);
                         // Add a listener for the SSL handshake
