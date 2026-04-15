@@ -30,15 +30,15 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
 
         new Bootstrap().group(ctx.channel().eventLoop().parent())
                 .channel(NioDatagramChannel.class)
-                // Enable broadcasting if needed
-                .option(ChannelOption.SO_BROADCAST, true)
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
+                .option(ChannelOption.SO_KEEPALIVE, true)
                 .handler(new ChannelInitializer<DatagramChannel>() {
                     @Override
                     protected void initChannel(DatagramChannel ch) {
                         ch.pipeline().addLast(new UdpRelayHandler(bus));
                     }
                 })
-                .bind(bus.params.getUdpHost(), bus.utils.IPV4_ZERO_PORT)
+                .bind(bus.utils.IPV4_ZERO_PORT)
                 .addListener((ChannelFutureListener) future -> {
                     if (future.isSuccess()) {
                         Channel bind = future.channel();

@@ -48,8 +48,8 @@ public class FwdAsoAckHandler extends SimpleChannelInboundHandler<Socks5CommandR
                 // establish UDP forward to 2nd leg
                 fwdBootStrap.group(ctx.channel().eventLoop())
                         .channel(NioDatagramChannel.class)
-                        // Enable broadcasting if needed
-                        .option(ChannelOption.SO_BROADCAST, true)
+                        .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
+                        .option(ChannelOption.SO_KEEPALIVE, true)
                         .handler(new ChannelInitializer<DatagramChannel>() {
                             @Override
                             protected void initChannel(DatagramChannel ch) {
