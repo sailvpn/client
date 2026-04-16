@@ -11,10 +11,5 @@ package com.illiad.proxy.config;
 public enum TokenMode {
     MANUAL,
     AUTO;
-
-    /**
-     * Recommended long-term token duration in months for MANUAL mode (informational).
-     */
-    public static final int LONG_TERM_TOKEN_MONTHS = 6;
 }
 
