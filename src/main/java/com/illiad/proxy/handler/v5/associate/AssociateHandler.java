@@ -28,6 +28,9 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
     @Override
     public void channelRead0(final ChannelHandlerContext ctx, final Socks5CommandRequest request) {
 
+        // Get the IP the client used to connect to the TCP control channel
+        String serverIp = ((InetSocketAddress) ctx.channel().localAddress()).getAddress().getHostAddress();
+
         new Bootstrap().group(ctx.channel().eventLoop().parent())
                 .channel(NioDatagramChannel.class)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
@@ -38,7 +41,7 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         ch.pipeline().addLast(new UdpRelayHandler(bus));
                     }
                 })
-                .bind(bus.utils.IPV4_ZERO_PORT)
+                .bind(serverIp, bus.utils.IPV4_ZERO_PORT)
                 .addListener((ChannelFutureListener) future -> {
                     if (future.isSuccess()) {
                         Channel bind = future.channel();
