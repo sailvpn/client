@@ -15,17 +15,14 @@ public class Params {
     private String remoteHost = "127.0.0.1";
     private String sni = "example.test";
     private int remotePort = 5001;
-    private String udpHost = "127.0.0.1";
     // crypto name as defined in Cryptos
     private String crypto = "SHA_256";
     private int min = 1;
     private int max = 64; // important, maximum value 128
     String secret = "password";
 
-    // NOTE: in-memory jwtToken removed to avoid embedding secrets in configuration objects.
-    // The client must use a TokenStore implementation (e.g. FileTokenStore) to load/save tokens as needed,
-    // and TokenManager to manage token lifecycle (acquisition/renewal).
-    private String jwtTokenFile = "./troad_token.jwt";
+    private String certPath = "./ca.crt";
+    private String jwtTokenFile = "./troad.jwt";
 
     // JWT auto-acquisition settings
     private String username = "";
