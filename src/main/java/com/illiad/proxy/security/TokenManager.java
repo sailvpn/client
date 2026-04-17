@@ -26,6 +26,7 @@ import reactor.netty.http.client.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Date;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -50,32 +51,14 @@ public class TokenManager {
         if (configured != null && !configured.isEmpty()) {
             this.tokenStore = new FileTokenStore(configured);
         } else {
-            String env = System.getenv("JWT_TOKEN_FILE");
-            if (env != null && !env.isEmpty()) {
-                this.tokenStore = new FileTokenStore(env);
-            } else {
-                String prop = System.getProperty("jwtTokenFile");
-                if (prop != null && !prop.isEmpty()) {
-                    this.tokenStore = new FileTokenStore(prop);
-                } else {
-                    this.tokenStore = new FileTokenStore("./token.jwt");
-                }
-            }
+            this.tokenStore = new FileTokenStore("./token.jwt");
         }
 
         // Load existing token holder from store if present (off main reactor threads)
         current.set(tokenStore.read());
     }
 
-    // package-private constructor for tests
-    TokenManager(Params params, HttpClient client, TokenStore store) {
-        this.params = params;
-        this.client = client;
-        this.tokenStore = store;
-        this.current.set(null);
-    }
-    
-    
+
     public String getCurrentToken() {
         return current.get();
     }
@@ -117,7 +100,7 @@ public class TokenManager {
                 // persist token to store on boundedElastic to avoid blocking reactor event loops
                 .flatMap(tr ->
                         Mono.fromCallable(() -> {
-                            tokenStore.write(objMapper.writeValueAsString(tr.getData()));
+                            tokenStore.write(tr.getData().getToken());
                             return tr.getData();
                         }).subscribeOn(Schedulers.boundedElastic())
                 );
@@ -142,9 +125,10 @@ public class TokenManager {
         if (TokenMode.AUTO == mode) {
             log.info("Automatic token mode enabled (tokenMode=auto)");
 
-            Instant  expiresAt = getExpireEpochMilli();
+            Instant  expiresAt = getExpireEpoch();
             // If no token present or expired => try to acquire via username/password synchronously (fail fast)
-            if (Instant.now().isAfter(expiresAt)) {
+            Instant now = Instant.now();
+            if (now.isAfter(expiresAt)) {
                 if (params.getUsername() == null || params.getUsername().isEmpty() ||
                         params.getPassword() == null || params.getPassword().isEmpty()) {
                     throw new IllegalStateException("Automatic token mode requires username/password when no valid token is available");
@@ -167,7 +151,7 @@ public class TokenManager {
                 } catch (Exception e) {
                     throw new IllegalStateException("Failed to acquire initial token", e);
                 }
-            } else if (Duration.between(Instant.now(), expiresAt).toMinutes() < params.getRenewInterval() * 5L) {
+            } else if (Duration.between(now, expiresAt).toMinutes() < params.getRenewInterval() * 5L) {
                 // Proactively renew once at startup if close to expiry; do this asynchronously (don't block startup)
                 TokenGenerateRequest req = new TokenGenerateRequest();
                 req.setCurrentToken(current.get());
@@ -220,19 +204,23 @@ public class TokenManager {
         // build bytes template for renew requests when needed
         renewDisposable = reactor.core.publisher.Flux.interval(Duration.ofMinutes(renewInterval), Duration.ofMinutes(renewInterval), Schedulers.parallel())
                 .flatMap(tick -> {
-                    try {
-                        TokenGenerateRequest req = new TokenGenerateRequest();
-                        req.setCurrentToken(current.get());
-                        req.setExpirationMinutes(params.getExpireMins());
-                        byte[] requestBytes = objMapper.writeValueAsBytes(req);
-                        return postGenerate(requestBytes)
-                                .doOnNext(data -> current.set(data.getToken()))
-                                .onErrorResume(e -> {
-                                    log.error("Error renewing token: {}", e.getMessage(), e);
-                                    return Mono.empty();
-                                });
-                    } catch (JsonProcessingException e) {
-                        log.error("Failed to serialize renewal request", e);
+                    if (Duration.between(Instant.now(), getExpireEpoch()).toMinutes() < params.getRenewInterval() * 5L) {
+                        try {
+                            TokenGenerateRequest req = new TokenGenerateRequest();
+                            req.setCurrentToken(current.get());
+                            req.setExpirationMinutes(params.getExpireMins());
+                            byte[] requestBytes = objMapper.writeValueAsBytes(req);
+                            return postGenerate(requestBytes)
+                                    .doOnNext(data -> current.set(data.getToken()))
+                                    .onErrorResume(e -> {
+                                        log.error("Error renewing token: {}", e.getMessage(), e);
+                                        return Mono.empty();
+                                    });
+                        } catch (JsonProcessingException e) {
+                            log.error("Failed to serialize renewal request", e);
+                            return Mono.empty();
+                        }
+                    } else {
                         return Mono.empty();
                     }
                 })
@@ -249,13 +237,13 @@ public class TokenManager {
         }
     }
 
-
-    private Instant getExpireEpochMilli() {
+    private Instant getExpireEpoch() {
         Claims claims = parseJWT(current.get());
         if (claims != null) {
-            Long expiresAt = claims.get("expiresAt", Long.class);
-            if (expiresAt != null) {
-                return Instant.ofEpochMilli(expiresAt);
+            // Standard 'exp' claim is retrieved as a Date object in JJWT
+            Date expiration = claims.getExpiration();
+            if (expiration != null) {
+                return expiration.toInstant();
             }
         }
         return Instant.EPOCH; // treat as expired if we can't parse
@@ -263,15 +251,19 @@ public class TokenManager {
 
     private static Claims parseJWT(String jwtString) {
         if (jwtString != null) {
-            // Standard JJWT trick: remove signature to treat as unsecured
-            int i = jwtString.lastIndexOf('.');
-            if (i > 0) {
-                String withoutSignature = jwtString.substring(0, i + 1);
-                return Jwts.parser()
-                        .unsecured() // Explicitly tell the parser to allow unsigned JWTs
-                        .build()
-                        .parseUnsecuredClaims(withoutSignature)
-                        .getPayload();
+            try {
+                // Standard JJWT 0.12+ approach to parse without signature verification
+                int i = jwtString.lastIndexOf('.');
+                if (i > 0) {
+                    String withoutSignature = jwtString.substring(0, i + 1);
+                    return Jwts.parser()
+                            .unsecured()
+                            .build()
+                            .parseUnsecuredClaims(withoutSignature)
+                            .getPayload();
+                }
+            } catch (Exception e) {
+                // Log error or ignore if the token format is invalid
             }
         }
         return null;
