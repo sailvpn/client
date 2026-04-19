@@ -5,10 +5,7 @@ import com.illiad.proxy.codec.v5.V5InitReqDecoder;
 import com.illiad.proxy.handler.http.FrontHandler;
 import com.illiad.proxy.handler.v5.V5CommandHandler;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.EventLoopGroup;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -71,6 +68,7 @@ public class Starter {
         ServerBootstrap bs = new ServerBootstrap();
         bs.group(socksBossGroup, socksWorkerGroup)
                 .channel(NioServerSocketChannel.class)
+                .childOption(ChannelOption.SO_KEEPALIVE, true)
                 .childHandler(new ChannelInitializer<NioSocketChannel>() {
                     @Override
                     protected void initChannel(NioSocketChannel ch) {
@@ -93,6 +91,7 @@ public class Starter {
         ServerBootstrap bh = new ServerBootstrap();
         bh.group(httpBossGroup, httpWorkerGroup)
                 .channel(NioServerSocketChannel.class)
+                .childOption(ChannelOption.SO_KEEPALIVE, true)
                 .handler(new LoggingHandler(LogLevel.INFO))
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
