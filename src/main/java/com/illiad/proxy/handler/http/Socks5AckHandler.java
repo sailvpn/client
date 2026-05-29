@@ -72,7 +72,6 @@ public class Socks5AckHandler extends SimpleChannelInboundHandler<Socks5CommandR
             handleSocksFailure(ctx, response);
         }
 
-        ReferenceCountUtil.release(initialReq);
     }
 
     private void handleHttpsEstablished(Channel frontend, Channel backend) {
