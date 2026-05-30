@@ -77,34 +77,38 @@ public class TokenManager {
      */
     private Mono<Data> postGenerate(byte[] requestBytes) {
         String uri = "https://" + params.getRemoteHost() + ":" + params.getRemotePort() + "/api/auth/token/generate";
+
         return client
                 .headers(headers -> headers.set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON))
-                .post().uri(uri)
+                .post()
+                .uri(uri)
                 .send(Mono.just(Unpooled.wrappedBuffer(requestBytes)))
-                .responseSingle((response, byteBufMono) ->
-                        byteBufMono.asString(StandardCharsets.UTF_8)
-                                .flatMap(body -> {
-                                    int code = response.status().code();
-                                    if (code >= 200 && code < 300) {
-                                        try {
-                                            TokenResponse tr = objMapper.readValue(body, TokenResponse.class);
-                                            return Mono.just(tr);
-                                        } catch (JsonProcessingException e) {
-                                            return Mono.error(e);
-                                        }
-                                    } else {
-                                        return Mono.error(new RuntimeException("HTTP " + code + ": " + body));
-                                    }
-                                })
+                .responseSingle((response, byteBufMono) -> byteBufMono.asString(StandardCharsets.UTF_8)
+                        .flatMap(body -> {
+                            int code = response.status().code();
+                            if (code >= 200 && code < 300) {
+                                try {
+                                    TokenResponse tr = objMapper.readValue(body, TokenResponse.class);
+                                    return Mono.just(tr);
+                                } catch (JsonProcessingException e) {
+                                    return Mono.error(e);
+                                }
+                            } else {
+                                return Mono.error(new RuntimeException("HTTP " + code + ": " + body));
+                            }
+                        })
                 )
-                // persist token to store on boundedElastic to avoid blocking reactor event loops
-                .flatMap(tr ->
-                        Mono.fromCallable(() -> {
-                            tokenStore.write(tr.getData().getToken());
-                            return tr.getData();
-                        }).subscribeOn(Schedulers.boundedElastic())
-                );
+                // CRITICAL FIX: Shifts execution to background threads to break the Netty Event Loop deadlock
+                .publishOn(Schedulers.boundedElastic())
+                // Persist token to store on boundedElastic to avoid blocking reactor event loops
+                .flatMap(tr -> Mono.fromCallable(() -> {
+                    if (tokenStore != null) {
+                        tokenStore.write(tr.getData().getToken());
+                    }
+                    return tr.getData();
+                }));
     }
+
 
     /**
      * Initialize token management - acquire initial token and start renewal
@@ -124,10 +128,9 @@ public class TokenManager {
 
         if (TokenMode.AUTO == mode) {
             log.info("Automatic token mode enabled (tokenMode=auto)");
-
-            Instant  expiresAt = getExpireEpoch();
-            // If no token present or expired => try to acquire via username/password synchronously (fail fast)
+            Instant expiresAt = getExpireEpoch();
             Instant now = Instant.now();
+
             if (now.isAfter(expiresAt)) {
                 if (params.getUsername() == null || params.getUsername().isEmpty() ||
                         params.getPassword() == null || params.getPassword().isEmpty()) {
@@ -141,12 +144,15 @@ public class TokenManager {
                 byte[] requestBytes = objMapper.writeValueAsBytes(req);
 
                 try {
-                    // block with a reasonable timeout so startup fails fast on misconfiguration
+                    // CRITICAL FIX: Add explicit scheduling off the main thread before blocking
                     Data data = postGenerate(requestBytes)
+                            .subscribeOn(Schedulers.boundedElastic()) // Frees startup thread during connection setup
+                            .publishOn(Schedulers.boundedElastic())   // Frees Netty Event Loops during body evaluation
                             .timeout(Duration.ofSeconds(10))
-                            .block();
+                            .block(); // Safe to block here now
+
                     if (data != null) {
-                       current.set(data.getToken());
+                        current.set(data.getToken());
                     }
                 } catch (Exception e) {
                     throw new IllegalStateException("Failed to acquire initial token", e);
@@ -161,15 +167,17 @@ public class TokenManager {
                     requestBytes = objMapper.writeValueAsBytes(req);
                     postGenerate(requestBytes)
                             .subscribeOn(Schedulers.boundedElastic())
-                            .subscribe(data -> current.set(data.getToken()),
-                                    err -> log.error("Error acquiring token: {}", err.getMessage(), err));
+                            .subscribe(
+                                    data -> current.set(data.getToken()),
+                                    err -> log.error("Error acquiring token: {}", err.getMessage(), err)
+                            );
                 } catch (JsonProcessingException e) {
                     log.error("Failed to build token renewal request", e);
                 }
             }
-
             startAutoRenewal();
-        } else { // MANUAL
+        } else {
+            // MANUAL
             try {
                 String stored = tokenStore != null ? tokenStore.read() : null;
                 if (stored == null || stored.isEmpty()) {
