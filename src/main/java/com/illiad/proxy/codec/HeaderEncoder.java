@@ -4,8 +4,6 @@ import com.illiad.proxy.security.Secret;
 import io.netty.buffer.ByteBuf;
 import org.springframework.stereotype.Component;
 
-import java.security.SecureRandom;
-
 /**
  * illiad header frame:
  * - 2 bytes: frame length (unsigned short)
