@@ -4,26 +4,26 @@ import com.illiad.proxy.security.Secret;
 import io.netty.buffer.ByteBuf;
 import org.springframework.stereotype.Component;
 
+import java.security.SecureRandom;
+
 /**
- * Encodes a client-side illiad Header into a {@link ByteBuf}.
- * an illiad header is a byte array of variable lenght, ended by CRLF.
- * the first 2 bytes is the length. the next byte is the crypto type. then comes the signature, an offset, ended with CRLF.
- * if the encryption returns a fixed-length signature, the length field indicates the length of whole header (length + cryptoType + signature + offset + CRLF).
- * if the encryption returns a variable-length signature, the length field indicates the length till the end of signature (length + cryptoType + signature).
+ * illiad header frame:
+ * - 2 bytes: frame length (unsigned short)
+ * - 2 bytes: token length (unsigned short)
+ * - 1 byte: crypto type
+ * - token bytes: variable
+ * - random bytes: variable
  */
 @Component
 public class HeaderEncoder {
 
-    private final static byte[] CRLF = new byte[]{0x0D, 0x0A};
     private final Secret secret;
 
     public HeaderEncoder(Secret secret) {
         this.secret = secret;
     }
 
-
     public void encodeHeader(ByteBuf byteBuf) {
-
         // get secret
         byte[] secretBytes;
         try {
@@ -32,23 +32,19 @@ public class HeaderEncoder {
             throw new RuntimeException(e);
         }
 
-        byte[] offset = secret.offset();
-        final short signLength = secret.getCryptoLength();
-        // check if the crypto type is fixed length
-        if (signLength > 0) {
-            // fixed-length signature, length field indicates the length of whole header(length + cryptoType + signature + offset + CRLF).
-            // 5 = 2 bytes for length + 1 byte for crypto type + 2 bytes for CRLF
-            byteBuf.writeShort((short) (signLength + offset.length + 5) & 0xFFFF);
-        } else {
-            // variable-length signature, the length field indicates the length till the end of the signature(length + cryptoType + signature).
-            // 3 = 2 bytes for length + 1 byte for crypto type
-            byteBuf.writeShort((short) (secretBytes.length + 3) & 0xFFFF);
-        }
-        // write crypto type, signature, and offset into ByteBuffer
+        byte[] offset = secret.offset(); // Cryptographically secure random binary data
+
+        int secretLength = secretBytes.length;
+        // 2. Calculate Total Payload Length (Fields after the first 2 bytes)
+        // 2 bytes (jwtLength) + 1 byte (typeInfo) + jwt length + random padding length
+        int frameLength = 2 + 1 + secretLength + offset.length;
+
+        // 3. Pack everything sequentially into the Netty ByteBuf
+        byteBuf.writeShort(frameLength);
+        byteBuf.writeShort(secretLength);
         byteBuf.writeByte(secret.getCryptoTypeByte());
-        byteBuf.writeBytes(secretBytes);
+        byteBuf.writeBytes(byteBuf);
         byteBuf.writeBytes(offset);
-        byteBuf.writeBytes(CRLF);
     }
 
 }
