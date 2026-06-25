@@ -37,7 +37,7 @@ public class HeaderEncoder {
         int secretLength = secretBytes.length;
         // 2. Calculate Total Payload Length (Fields after the first 2 bytes)
         // 2 bytes (jwtLength) + 1 byte (typeInfo) + jwt length + random padding length
-        int frameLength = 2 + 1 + secretLength + offset.length;
+        int frameLength = 3 + secretLength + offset.length;
 
         // 3. Pack everything sequentially into the Netty ByteBuf
         byteBuf.writeShort(frameLength);
