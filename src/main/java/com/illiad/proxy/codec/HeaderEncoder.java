@@ -29,19 +29,18 @@ public class HeaderEncoder {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-
         byte[] offset = secret.offset(); // Cryptographically secure random binary data
-
-        int secretLength = secretBytes.length;
-        // 2. Calculate Total Payload Length (Fields after the first 2 bytes)
-        // 2 bytes (jwtLength) + 1 byte (typeInfo) + jwt length + random padding length
-        int frameLength = 3 + secretLength + offset.length;
-
-        // 3. Pack everything sequentially into the Netty ByteBuf
-        byteBuf.writeShort(frameLength);
-        byteBuf.writeShort(secretLength);
+        int tokenLen = secretBytes.length;
+        // Packing byteBuf
+        // frameLength = Fields after the first 2 bytes = 2 bytes (tokenLen) + 1 byte (type) + token length + pad length
+        byteBuf.writeShort(3 + tokenLen + offset.length);
+        // token length
+        byteBuf.writeShort(tokenLen);
+        // crypt type
         byteBuf.writeByte(secret.getCryptoTypeByte());
-        byteBuf.writeBytes(byteBuf);
+        // token
+        byteBuf.writeBytes(secretBytes);
+        // pad
         byteBuf.writeBytes(offset);
     }
 
