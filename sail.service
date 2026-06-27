@@ -1,0 +1,18 @@
+[Unit]
+Description=My Java Application Service
+After=network.target
+
+[Service]
+Type=forking
+# Replace with the user who owns the jar file (do not run as root if possible)
+User=myuser
+# The exact directory where your script and JAR are located
+WorkingDirectory=/home/myuser/apps/myapp
+# Systemd natively manages logs, but we point to your start/stop scripts
+ExecStart=/home/myuser/apps/myapp/manage_app.sh start
+ExecStop=/home/myuser/apps/myapp/manage_app.sh stop
+# Automatically restart the app if it crashes unexpectedly
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
