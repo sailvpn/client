@@ -55,8 +55,8 @@ public class SecretImp implements Secret {
 
     @Override
     public byte[] offset() {
-        // generate random ran bytes of length params.min..params.max
-        int offsetLen = secureRandom.nextInt(params.getMax()) + params.getMin();
+        // generate random bytes of length params.min..params.max
+        int offsetLen = params.getMin() + secureRandom.nextInt(params.getMax() - params.getMin());
         byte[] offsetBytes = new byte[offsetLen];
         secureRandom.nextBytes(offsetBytes);
         return offsetBytes;
