@@ -1,30 +1,66 @@
 @echo off
-SET "JAR_NAME=my_app.jar"
+setlocal enabledelayedexpansion
 
-IF "%1"=="start" GOTO START_APP
-IF "%1"=="stop" GOTO STOP_APP
-GOTO USAGE
+:: Configuration
+set "JAR_NAME=my_app.jar"
+set "APP_TITLE=my_java_app_title"
+set "LOG_FILE=app.log"
 
-:START_APP
-echo Starting application in background...
-:: javaw runs without a console window; start /B keeps it in the background
-start /B javaw -jar "%JAR_NAME%" > app.log 2>&1
-echo Application launched.
-GOTO END
+:: Read command-line argument
+set "COMMAND=%~1"
 
-:STOP_APP
-echo Stopping application...
-:: taskkill searches for the specific command-line string of your JAR
-taskkill /F /FI "IMAGENAME eq javaw.exe" /FI "COMMANDLINE eq *%JAR_NAME%*" >nul 2>&1
-:: Fallback to standard check if command-line filtering fails on older Windows versions
-if %errorlevel% NEQ 0 (
-    taskkill /F /FI "IMAGENAME eq javaw.exe"
-)
-echo Application stopped.
-GOTO END
+if "%COMMAND%"=="start" goto do_start
+if "%COMMAND%"=="stop" goto do_stop
+if "%COMMAND%"=="status" goto do_status
 
-:USAGE
-echo Usage: %~nx0 {start^|stop}
-GOTO END
+:usage
+echo Usage: %~nx0 {start^|stop^|status}
+exit /b 1
 
-:END
+:do_start
+    :: Check if the app is already running by searching for the window title
+    tasklist /FI "WINDOWTITLE eq %APP_TITLE%" 2>NUL | find /I "javaw.exe" >NUL
+    if %ERRORLEVEL% equ 0 (
+        echo Application is already running.
+        exit /b 0
+    )
+
+    echo Starting application...
+    :: 'start' runs it in the background, '/B' hides the window, 'javaw' keeps it backgrounded
+    start "%APP_TITLE%" /B javaw -jar "%JAR_NAME%" > "%LOG_FILE%" 2>&1
+    echo Application started in background.
+    exit /b 0
+
+:do_stop
+    :: Check if the app is actually running before trying to kill it
+    tasklist /FI "WINDOWTITLE eq %APP_TITLE%" 2>NUL | find /I "javaw.exe" >NUL
+    if %ERRORLEVEL% neq 0 (
+        echo Application is not running.
+        exit /b 0
+    )
+
+    echo Stopping application...
+    :: Gracefully request termination first
+    taskkill /FI "WINDOWTITLE eq %APP_TITLE%" >NUL 2>&1
+
+    :: Wait up to 3 seconds for it to close
+    timeout /t 3 /nobreak >nul
+
+    :: Force kill (/F) if it is still stubborn and running
+    tasklist /FI "WINDOWTITLE eq %APP_TITLE%" 2>NUL | find /I "javaw.exe" >NUL
+    if %ERRORLEVEL% equ 0 (
+        echo Application did not stop gracefully. Forcing shutdown...
+        taskkill /F /FI "WINDOWTITLE eq %APP_TITLE%" >NUL 2>&1
+    )
+
+    echo Application stopped.
+    exit /b 0
+
+:do_status
+    tasklist /FI "WINDOWTITLE eq %APP_TITLE%" 2>NUL | find /I "javaw.exe" >NUL
+    if %ERRORLEVEL% equ 0 (
+        echo Application is RUNNING.
+    ) else (
+        echo Application is STOPPED.
+    )
+    exit /b 0
