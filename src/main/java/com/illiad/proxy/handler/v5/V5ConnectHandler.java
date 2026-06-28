@@ -1,6 +1,7 @@
 package com.illiad.proxy.handler.v5;
 
 import com.illiad.proxy.ParamBus;
+import com.illiad.proxy.codec.v5.PseudoResDecoder;
 import com.illiad.proxy.codec.v5.V5ClientDecoder;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
@@ -45,6 +46,8 @@ public class V5ConnectHandler extends SimpleChannelInboundHandler<Socks5CommandR
                             if (future1.isSuccess()) {
                                 // backend outbound encoder: standard socks5 command request (Connect)
                                 pipeline.addLast(bus.namer.generateName(), bus.v5ClientEncoder)
+                                        // TLS in TLS obfuscation
+                                        .addLast(new PseudoResDecoder())
                                         // backend inbound decoder: socks5 client decoder
                                         .addLast(bus.namer.generateName(), new V5ClientDecoder(bus))
                                         .addLast(bus.namer.generateName(), new V5AckHandler(ctx, bus))
