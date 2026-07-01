@@ -14,6 +14,8 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
+import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.handler.timeout.IdleStateHandler;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.springframework.stereotype.Component;
@@ -68,11 +70,26 @@ public class Starter {
         ServerBootstrap bs = new ServerBootstrap();
         bs.group(socksBossGroup, socksWorkerGroup)
                 .channel(NioServerSocketChannel.class)
-                .childOption(ChannelOption.SO_KEEPALIVE, true)
                 .childHandler(new ChannelInitializer<NioSocketChannel>() {
                     @Override
                     protected void initChannel(NioSocketChannel ch) {
                         ChannelPipeline pipeline = ch.pipeline();
+                        pipeline.addLast(new IdleStateHandler(0, 0, 60), new ChannelDuplexHandler() {
+                            @Override
+                            public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                                if (evt instanceof IdleStateEvent) {
+                                    bus.utils.closeOnFlush(ch);
+                                } else {
+                                    super.userEventTriggered(ctx, evt);
+                                }
+                            }
+
+                            @Override
+                            public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+                                bus.asos.removeAsobyFwdAssociate(ctx.channel());
+                                super.channelInactive(ctx);
+                            }
+                        });
                         pipeline.addLast(bus.namer.generateName(), bus.v5ServerEncoder);
                         pipeline.addLast(bus.namer.generateName(), new V5InitReqDecoder());
                         pipeline.addLast(bus.namer.generateName(), new V5CommandHandler(bus));
@@ -91,12 +108,21 @@ public class Starter {
         ServerBootstrap bh = new ServerBootstrap();
         bh.group(httpBossGroup, httpWorkerGroup)
                 .channel(NioServerSocketChannel.class)
-                .childOption(ChannelOption.SO_KEEPALIVE, true)
                 .handler(new LoggingHandler(LogLevel.INFO))
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) {
-                        ch.pipeline().addLast(bus.namer.generateName(), new HttpServerCodec())
+                        ch.pipeline().addLast(new IdleStateHandler(0, 0, 60), new ChannelDuplexHandler() {
+                                    @Override
+                                    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                                        if (evt instanceof IdleStateEvent) {
+                                            bus.utils.closeOnFlush(ch);
+                                        } else {
+                                            super.userEventTriggered(ctx, evt);
+                                        }
+                                    }
+                                })
+                                .addLast(bus.namer.generateName(), new HttpServerCodec())
                                 .addLast(bus.namer.generateName(), new HttpObjectAggregator(10 * 1024 * 1024)) // 10MB limit
                                 .addLast(bus.namer.generateName(), new FrontHandler(bus));
                     }
