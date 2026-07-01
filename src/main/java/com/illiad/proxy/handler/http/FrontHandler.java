@@ -1,6 +1,7 @@
 package com.illiad.proxy.handler.http;
 
 import com.illiad.proxy.ParamBus;
+import com.illiad.proxy.codec.v5.PseudoResDecoder;
 import com.illiad.proxy.codec.v5.V5ClientDecoder;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.Unpooled;
@@ -12,6 +13,8 @@ import io.netty.handler.codec.socksx.v5.DefaultSocks5CommandRequest;
 import io.netty.handler.codec.socksx.v5.Socks5CommandRequest;
 import io.netty.handler.codec.socksx.v5.Socks5CommandType;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.ReferenceCountUtil;
 
 import java.net.URI;
@@ -20,7 +23,6 @@ import java.net.URISyntaxException;
 public class FrontHandler extends ChannelInboundHandlerAdapter {
 
     private final ParamBus bus;
-    private final Bootstrap b = new Bootstrap();
     private Channel outbound;
 
     public FrontHandler(ParamBus bus) {
@@ -78,11 +80,10 @@ public class FrontHandler extends ChannelInboundHandlerAdapter {
                     port
             );
 
-
+            final Bootstrap b = new Bootstrap();
             b.group(ctx.channel().eventLoop())
                     .channel(NioSocketChannel.class)
                     .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
-                    .option(ChannelOption.SO_KEEPALIVE, true)
                     .handler(new ChannelInitializer<SocketChannel>() {
                         @Override
                         protected void initChannel(SocketChannel sc) {
@@ -99,8 +100,26 @@ public class FrontHandler extends ChannelInboundHandlerAdapter {
                             // Add a listener for the SSL handshake
                             sslHandler.handshakeFuture().addListener(future1 -> {
                                 if (future1.isSuccess()) {
-                                    // backend outbound encoder: standard socks5 command request (Connect)
-                                    pipeline.addLast(bus.namer.generateName(), bus.v5ClientEncoder)
+
+                                    // TnT obfuscation
+                                    pipeline.addLast(new IdleStateHandler(0, 0, 60), new ChannelDuplexHandler() {
+                                                @Override
+                                                public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                                                    if (evt instanceof IdleStateEvent) {
+                                                        bus.utils.closeOnFlush(ctx.channel());
+                                                    } else {
+                                                        super.userEventTriggered(ctx, evt);
+                                                    }
+                                                }
+
+                                                @Override
+                                                public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+                                                    super.channelInactive(ctx);
+                                                }
+                                            })
+                                            .addLast(new PseudoResDecoder())
+                                            // backend outbound encoder: standard socks5 command request (Connect)
+                                            .addLast(bus.namer.generateName(), bus.v5ClientEncoder)
                                             // backend inbound decoder: socks5 client decoder
                                             .addLast(bus.namer.generateName(), new V5ClientDecoder(bus))
                                             .addLast(bus.namer.generateName(), new Socks5AckHandler(ctx, bus, httpReq))
