@@ -63,8 +63,8 @@ public class FwdAsoAckHandler extends SimpleChannelInboundHandler<Socks5CommandR
                             if (future1.isSuccess()) {
                                 fwdUdpChannel.pipeline().addLast(new ResHandler(bus));
 
-                                // Register the active forward UDP leg across indices
-                                bus.asos.registerForwardChannel(aso, fwdUdpChannel);
+                                // bind the active forward UDP leg across indices
+                                bus.asos.bindFwd(aso, fwdUdpChannel);
 
                                 Channel bindChannel = aso.getBind();
                                 if (bindChannel != null) {
