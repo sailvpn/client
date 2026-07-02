@@ -48,7 +48,7 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
 
                         // Register the session to your high-performance thread-safe index
                         if (!bus.asos.initAso(ctx.channel(), bind)) {
-                            throw new RuntimeException("Failed to initialize Aso");
+                            ctx.fireExceptionCaught(new RuntimeException("Failed to initialize Aso"));
                         }
                         InetSocketAddress localAddr = (InetSocketAddress) bind.localAddress();
                         String host = localAddr.getHostString();
@@ -90,7 +90,7 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         // FIX: Loop first to remove SOCKS5 protocol codecs while preserving Idle/Timeout handlers
                         String prefix = bus.namer.getPrefix();
                         for (String name : pipeline.names()) {
-                            if (name.startsWith(prefix) && !name.toLowerCase().contains("idle")) {
+                            if (name.startsWith(prefix)) {
                                 // Don't remove 'this' here if it matches the prefix; we handle it cleanly below
                                 if (!name.equals(pipeline.context(this).name())) {
                                     pipeline.remove(name);
@@ -99,9 +99,9 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         }
 
                         // FIX: Safely pull out this specific setup handler last to avoid NoSuchElementException
-                        if (pipeline.context(this) != null) {
-                            pipeline.remove(this);
-                        }
+
+                        pipeline.remove(this);
+
 
                     } else {
                         ctx.fireExceptionCaught(new Exception(bus.utils.associateFailed, future.cause()));
