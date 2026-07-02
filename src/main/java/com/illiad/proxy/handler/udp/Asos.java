@@ -74,14 +74,21 @@ public class Asos {
         }
     }
 
-    public void unbindForward(Aso aso, Channel forward) {
+    public void debindForward(Aso aso, Channel forward) {
         if (aso != null && forward != null) {
-            if (forward.isActive() && forward.isOpen()) {
+            forwardIndex.remove(forward.id());
+            aso.setForward(null);
+            if (forward.isOpen()) {
                 forward.close();
             }
-            aso.setForward(null);
+            Channel fwdAssociate = aso.getFwdAssociate();
+            if (fwdAssociate != null) {
+                fwdAssociateIndex.remove(fwdAssociate.id());
+                if (fwdAssociate.isOpen()) {
+                    fwdAssociate.close();
+                }
+            }
         }
-
     }
 
     public Aso getAsoByBind(Channel bind) {
