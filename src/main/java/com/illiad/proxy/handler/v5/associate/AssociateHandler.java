@@ -11,6 +11,8 @@ import io.netty.handler.codec.socksx.v5.DefaultSocks5CommandResponse;
 import io.netty.handler.codec.socksx.v5.Socks5CommandRequest;
 import io.netty.handler.codec.socksx.v5.Socks5CommandResponse;
 import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
+import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.handler.timeout.IdleStateHandler;
 
 import java.net.InetSocketAddress;
 
@@ -26,15 +28,14 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
     }
 
     @Override
-    public void channelRead0(final ChannelHandlerContext ctx, final Socks5CommandRequest request) {
+    protected void channelRead0(final ChannelHandlerContext ctx, final Socks5CommandRequest request) {
 
-        // Get the IP the client used to connect to the TCP control channel
+        // Get the local IP address the client connected to on the TCP control channel
         String serverIp = ((InetSocketAddress) ctx.channel().localAddress()).getAddress().getHostAddress();
+        Bootstrap udpBootstrap = new Bootstrap();
 
-        new Bootstrap().group(ctx.channel().eventLoop().parent())
+        udpBootstrap.group(ctx.channel().eventLoop())
                 .channel(NioDatagramChannel.class)
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
-                .option(ChannelOption.SO_KEEPALIVE, true)
                 .handler(new ChannelInitializer<DatagramChannel>() {
                     @Override
                     protected void initChannel(DatagramChannel ch) {
@@ -45,35 +46,69 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
                 .addListener((ChannelFutureListener) future -> {
                     if (future.isSuccess()) {
                         Channel bind = future.channel();
-                        // Register the new UDP associate-bind association in the binds list
-                        bus.asos.addAso(new Aso(ctx.channel(), bind));
+
+                        // Register the session to your high-performance thread-safe index
+                        if (!bus.asos.initAso(ctx.channel(), bind)) {
+                            throw new RuntimeException("Failed to initialize Aso");
+                        }
                         InetSocketAddress localAddr = (InetSocketAddress) bind.localAddress();
                         String host = localAddr.getHostString();
-                        // Build a successful UDP_ASSOCIATE response
+
+                        // Build compliant SOCKS5 success response
                         Socks5CommandResponse response = new DefaultSocks5CommandResponse(
                                 Socks5CommandStatus.SUCCESS,
                                 bus.utils.addressType(host),
                                 host,
                                 localAddr.getPort()
                         );
-                        // Write the response to the client
+
+                        // Send success status back down the client TCP link
                         ctx.channel().writeAndFlush(response);
-                        ctx.pipeline().addLast(new CloseHandler(bus));
-                        ctx.pipeline().remove(this);
-                        // remove all handlers from frontendPipeline
-                        String prefix = bus.namer.getPrefix();
+
                         ChannelPipeline pipeline = ctx.pipeline();
+                        pipeline.addLast(new IdleStateHandler(0, 0, 60), new ChannelDuplexHandler() {
+                            @Override
+                            public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                                if (evt instanceof IdleStateEvent) {
+                                    // No traffic detected for 60 seconds, close the hung proxy tunnel
+                                    bus.utils.closeOnFlush(ctx.channel());
+                                } else {
+                                    super.userEventTriggered(ctx, evt);
+                                }
+                            }
+
+                            // Triggered when the TCP socket physically breaks or closes (FIN/RST)
+                            @Override
+                            public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+                                // Client disconnected -> Run the exact same cascading-close mechanism
+                                bus.asos.removeAsobyAssociate(ctx.channel());
+
+                                // Pass the event down the pipeline in case downstream handlers need it
+                                super.channelInactive(ctx);
+                            }
+                        });
+
+                        // FIX: Loop first to remove SOCKS5 protocol codecs while preserving Idle/Timeout handlers
+                        String prefix = bus.namer.getPrefix();
                         for (String name : pipeline.names()) {
-                            if (name.startsWith(prefix)) {
-                                pipeline.remove(name);
+                            if (name.startsWith(prefix) && !name.toLowerCase().contains("idle")) {
+                                // Don't remove 'this' here if it matches the prefix; we handle it cleanly below
+                                if (!name.equals(pipeline.context(this).name())) {
+                                    pipeline.remove(name);
+                                }
                             }
                         }
+
+                        // FIX: Safely pull out this specific setup handler last to avoid NoSuchElementException
+                        if (pipeline.context(this) != null) {
+                            pipeline.remove(this);
+                        }
+
                     } else {
-                        ctx.fireExceptionCaught(new Exception(bus.utils.associateFailed));
+                        ctx.fireExceptionCaught(new Exception(bus.utils.associateFailed, future.cause()));
                     }
                 });
     }
-
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
