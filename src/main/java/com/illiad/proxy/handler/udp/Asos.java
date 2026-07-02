@@ -14,7 +14,7 @@ public class Asos {
     private final Map<ChannelId, Aso> bindIndex = new ConcurrentHashMap<>();
     private final Map<ChannelId, Aso> associateIndex = new ConcurrentHashMap<>();
     private final Map<ChannelId, Aso> fwdAssociateIndex = new ConcurrentHashMap<>();
-    private final Map<ChannelId, Aso> forwardChannelIndex = new ConcurrentHashMap<>();
+    private final Map<ChannelId, Aso> forwardIndex = new ConcurrentHashMap<>();
 
     // the init of Aso
     public boolean initAso(Channel associate, Channel bind) {
@@ -67,10 +67,10 @@ public class Asos {
     }
 
 
-    public void registerForwardChannel(Aso aso, Channel forwardChannel) {
-        if (aso != null && forwardChannel != null) {
-            aso.setForward(forwardChannel);
-            forwardChannelIndex.put(forwardChannel.id(), aso);
+    public void bindFwd(Aso aso, Channel forward) {
+        if (aso != null && forward != null) {
+            aso.setForward(forward);
+            forwardIndex.put(forward.id(), aso);
         }
     }
 
@@ -80,7 +80,6 @@ public class Asos {
                 forward.close();
             }
             aso.setForward(null);
-            forwardChannelIndex.remove(forward.id());
         }
 
     }
@@ -94,7 +93,7 @@ public class Asos {
     }
 
     public Aso getAsobyForward(Channel forward) {
-        return forward != null ? forwardChannelIndex.get(forward.id()) : null;
+        return forward != null ? forwardIndex.get(forward.id()) : null;
     }
 
     public Aso getAsobyFwdAssociate(Channel fwAssociate) {
@@ -105,7 +104,6 @@ public class Asos {
         if (bind == null) return null;
         Aso aso = bindIndex.remove(bind.id());
         if (aso != null) {
-            if (aso.getSource() != null) sourceIndex.remove(aso.getSource());
             cleanIndexesAndClose(aso);
         }
         return aso;
@@ -115,7 +113,6 @@ public class Asos {
         if (associate == null) return null;
         Aso aso = associateIndex.remove(associate.id());
         if (aso != null) {
-            if (aso.getSource() != null) sourceIndex.remove(aso.getSource());
             cleanIndexesAndClose(aso);
         }
         return aso;
@@ -125,7 +122,6 @@ public class Asos {
         if (fwdAssociate == null) return null;
         Aso aso = fwdAssociateIndex.remove(fwdAssociate.id());
         if (aso != null) {
-            if (aso.getSource() != null) sourceIndex.remove(aso.getSource());
             cleanIndexesAndClose(aso);
         }
         return aso;
@@ -141,10 +137,11 @@ public class Asos {
     }
 
     private void cleanIndexesAndClose(Aso aso) {
+        if (aso.getSource() != null) sourceIndex.remove(aso.getSource());
         if (aso.getBind() != null) bindIndex.remove(aso.getBind().id());
         if (aso.getAssociate() != null) associateIndex.remove(aso.getAssociate().id());
         if (aso.getFwdAssociate() != null) fwdAssociateIndex.remove(aso.getFwdAssociate().id());
-        if (aso.getForward() != null) forwardChannelIndex.remove(aso.getForward().id());
+        if (aso.getForward() != null) forwardIndex.remove(aso.getForward().id());
 
         // Execute clean, non-leaking teardown of the entire session context
         aso.closeAll();
