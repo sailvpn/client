@@ -87,10 +87,7 @@ public class FwdAsoAckHandler extends SimpleChannelInboundHandler<Socks5CommandR
                                     }
                                 }
                                 // 4. Remove this handshake ack handler from the TCP pipeline
-                                if (ctx.pipeline().context(this) != null) {
-                                    ctx.pipeline().remove(this);
-                                }
-
+                                ctx.pipeline().remove(this);
                             } else {
                                 ctx.fireExceptionCaught(future1.cause());
                                 bus.asos.removeAsobyFwdAssociate(ctx.channel());
