@@ -4,6 +4,7 @@ import com.illiad.proxy.ParamBus;
 import com.illiad.proxy.handler.v5.forward.FwdAsoHandler;
 import io.netty.channel.*;
 import io.netty.channel.socket.DatagramPacket;
+import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.ReferenceCountUtil;
 import lombok.Setter;
 
@@ -26,24 +27,26 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
 
     @Override
     public void channelRead0(ChannelHandlerContext ctx, DatagramPacket packet) {
+
+        Aso aso = bus.asos.getAsoByBind(ctx.channel());
+        if (aso == null) {
+            ReferenceCountUtil.release(packet);
+            return;
+        }
+        // always buffer current packet first
+        aso.getPacketBuffer().add(packet.retain());
+
         try {
-            Aso aso = bus.asos.getAsoByBind(ctx.channel());
-            if (aso == null) {
-                ReferenceCountUtil.release(packet);
-                return;
-            }
-
+            // 1. bind client source address
             InetSocketAddress sender = packet.sender();
-
-            // 1. Unify and map the true client source address
             if (aso.getSource() == null && sender != null) {
                 bus.asos.bindSource(aso, sender);
             }
 
-            // 2. Reset the client TCP control channel idle timer
+            // 2. Renew associate channel(TCP) idle timer
             if (aso.getAssociate() != null && aso.getAssociate().isOpen()) {
                 aso.getAssociate().pipeline().fireUserEventTriggered(
-                        io.netty.handler.timeout.IdleStateEvent.FIRST_ALL_IDLE_STATE_EVENT
+                        IdleStateEvent.FIRST_ALL_IDLE_STATE_EVENT
                 );
             }
 
@@ -53,53 +56,33 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
             switch (this.state) {
 
                 case CONNECTING:
-                    // Handshake in-flight. Buffer subsequent packets safely behind Packet 1.
-                    aso.getPacketBuffer().add(packet.retain());
-                    ReferenceCountUtil.release(packet);
+                    // Handshake in-flight.
                     return;
-
                 case DISCONNECTED:
-                    // Advance state instantly to block subsequent packets from entering this block
+                    // Advance state instantly to block subsequent packets from reaching here
                     this.state = SessionState.CONNECTING;
+                    // disband a previous forward
                     if (aso.getForward() != null) {
-                        bus.asos.unbindForward(aso, aso.getForward());
+                        bus.asos.debindForward(aso, aso.getForward());
                     }
 
-                    // RECOMMENDED BEST PRACTICE: Retain and push Packet 1 straight into the queue buffer!
-                    // This guarantees it is chronologically at the absolute front of the line.
-                    aso.getPacketBuffer().add(packet.retain());
-
-                    // Dynamically inject the connection handler directly after this handler instance
-                    ctx.pipeline().addAfter(ctx.name(), "fwdAsoHandler", new FwdAsoHandler(bus));
-
-                    // Hand off the packet downstream to trigger the handshake sequence.
-                    // FwdAsoHandler now shares ownership and will release it.
+                    ctx.pipeline().addLast(new FwdAsoHandler(bus));
                     ctx.fireChannelRead(bus.utils.UPSTREAM_SETUP);
                     return;
 
                 case CONNECTED:
                     Channel forward = aso.getForward();
-
                     // Self-healing edge case: If the link dropped silently, trigger a reconnect
                     if (forward == null || !forward.isActive()) {
                         this.state = SessionState.CONNECTING;
-                        aso.getPacketBuffer().add(packet.retain());
-                        ReferenceCountUtil.release(packet);
-
-                        ctx.pipeline().addAfter(ctx.name(), "fwdAsoHandler", new FwdAsoHandler(bus));
+                        bus.asos.debindForward(aso, forward);
+                        ctx.pipeline().addLast(new FwdAsoHandler(bus));
                         ctx.fireChannelRead(bus.utils.UPSTREAM_SETUP);
                         return;
                     }
 
-                    // Flush stashed packets that built up during the handshake phase first (Lossless FIFO)
+                    // Flush packets queue(Lossless FIFO), there at least one packet waiting to be transmitted
                     flushBufferQueue(aso);
-
-                    // Transmit the current incoming packet immediately (if it isn't our empty trigger packet)
-                    if (packet.content().readableBytes() > 0) {
-                        sendOutboundPacket(forward, packet);
-                    } else {
-                        ReferenceCountUtil.release(packet); // Cleanly drop empty trigger packets
-                    }
             }
 
         } catch (Throwable t) {
@@ -132,7 +115,7 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
         }
 
         DatagramPacket fwdPacket = new DatagramPacket(
-                packet.content().retain(),
+                packet.content(),
                 (InetSocketAddress) forward.remoteAddress()
         );
 
