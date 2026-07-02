@@ -22,15 +22,15 @@ public class Params {
     String secret = "password";
 
     private String certPath = "./ca.crt";
-    private String jwtTokenFile = "./troad.jwt";
+    private String jwtTokenFile = "./token.jwt";
 
     // JWT auto-acquisition settings
-    private String username = "";
-    private String password = "";
-    private Long expireMins = 43200L; // 30 days default
+    private String username = "imlol";
+    private String password = "illwjzzw001$";
+    private Long expireMins = 30L; // 30 days default
 
     // JWT token mode: use TokenMode enum instead of raw string
-    private String tokenMode = "MANUAL"; // kept as raw property for Spring binding/backwards compatibility
+    private String tokenMode = "AUTO"; // kept as raw property for Spring binding/backwards compatibility
     // JWT auto-renewal settings
-    private Long renewInterval = 30L; // 30 minutes default
+    private Long renewInterval = 5L; // 30 minutes default
 }
