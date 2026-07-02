@@ -1,7 +1,6 @@
 package com.illiad.proxy.handler.v5.associate;
 
 import com.illiad.proxy.ParamBus;
-import com.illiad.proxy.handler.udp.Aso;
 import com.illiad.proxy.handler.udp.UdpRelayHandler;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
