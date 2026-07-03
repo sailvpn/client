@@ -2,6 +2,7 @@ package com.illiad.proxy.handler.udp;
 
 import com.illiad.proxy.ParamBus;
 import com.illiad.proxy.handler.v5.forward.FwdAsoHandler;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.handler.timeout.IdleStateEvent;
@@ -17,33 +18,35 @@ import java.net.InetSocketAddress;
 public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket> {
 
     private final ParamBus bus;
+
+    // Volatile guarantees atomic visibility across different Netty EventLoop threads
     @Setter
-    private SessionState state = SessionState.DISCONNECTED;
+    private volatile SessionState state = SessionState.DISCONNECTED;
 
     public UdpRelayHandler(ParamBus bus) {
-        super(false); // Manual lifecycle management is mandatory when handling buffer queues
         this.bus = bus;
     }
 
     @Override
     public void channelRead0(ChannelHandlerContext ctx, DatagramPacket packet) {
-
         Aso aso = bus.asos.getAsoByBind(ctx.channel());
         if (aso == null) {
-            ReferenceCountUtil.release(packet);
-            return;
+            return; // super(true) handles the inbound packet release automatically
         }
+
         // always buffer current packet first
-        aso.getPacketBuffer().add(packet.retain());
+        // Isolate reader/writer indexes and increase reference count for the FIFO queue buffer.
+        // This keeps payloads safe even after channelRead0 yields control back to Netty.
+        aso.getPacketBuffer().add(packet.content().retainedDuplicate());
 
         try {
-            // 1. bind client source address
+            // 1. Bind client source address
             InetSocketAddress sender = packet.sender();
             if (aso.getSource() == null && sender != null) {
                 bus.asos.bindSource(aso, sender);
             }
 
-            // 2. Renew associate channel(TCP) idle timer
+            // 2. Renew associate channel (TCP) idle timer
             if (aso.getAssociate() != null && aso.getAssociate().isOpen()) {
                 aso.getAssociate().pipeline().fireUserEventTriggered(
                         IdleStateEvent.FIRST_ALL_IDLE_STATE_EVENT
@@ -54,86 +57,104 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
             // STATE MACHINE ENFORCEMENT
             // =================================================================
             switch (this.state) {
-
                 case CONNECTING:
-                    // Handshake in-flight.
+                    // Handshake in-flight. New packets accumulate safely in the buffer queue.
                     return;
-                case DISCONNECTED:
-                    // Advance state instantly to block subsequent packets from reaching here
-                    this.state = SessionState.CONNECTING;
-                    // disband a previous forward
-                    if (aso.getForward() != null) {
-                        bus.asos.debindForward(aso, aso.getForward());
-                    }
 
-                    ctx.pipeline().addLast(new FwdAsoHandler(bus));
-                    ctx.fireChannelRead(bus.utils.UPSTREAM_SETUP);
+                case DISCONNECTED:
+                    reconnect(ctx, aso);
                     return;
 
                 case CONNECTED:
                     Channel forward = aso.getForward();
                     // Self-healing edge case: If the link dropped silently, trigger a reconnect
                     if (forward == null || !forward.isActive()) {
-                        this.state = SessionState.CONNECTING;
-                        bus.asos.debindForward(aso, forward);
-                        ctx.pipeline().addLast(new FwdAsoHandler(bus));
-                        ctx.fireChannelRead(bus.utils.UPSTREAM_SETUP);
+                        reconnect(ctx, aso);
                         return;
                     }
 
-                    // Flush packets queue(Lossless FIFO), there at least one packet waiting to be transmitted
-                    flushBufferQueue(aso);
+                    // Flush packet queue (Lossless FIFO)
+                    flushQueue(aso);
+                    break;
             }
 
         } catch (Throwable t) {
-            ReferenceCountUtil.release(packet);
             ctx.fireExceptionCaught(t);
         }
     }
 
-    private void flushBufferQueue(Aso aso) {
+    private void reconnect(ChannelHandlerContext ctx, Aso aso) {
+        this.state = SessionState.CONNECTING;
+        if (aso.getForward() != null) {
+            bus.asos.debindForward(aso, aso.getForward());
+        }
+        ctx.pipeline().addLast(new FwdAsoHandler(bus));
+        ctx.fireChannelRead(bus.utils.UPSTREAM_SETUP);
+    }
+
+    public void flushQueue(Aso aso) {
         Channel forward = aso.getForward();
         if (forward == null || !forward.isActive()) {
             this.state = SessionState.DISCONNECTED;
+            clearBufferQueue(aso);
             return;
         }
 
-        DatagramPacket bufferedPacket;
-        // Condition guard: Stop flushing immediately if an active write indicates the channel died midway
-        while ((bufferedPacket = aso.getPacketBuffer().poll()) != null) {
-            if (!sendOutboundPacket(forward, bufferedPacket)) {
+        // Check forward.isWritable() to prevent over-allocating memory if the network is saturated
+        while (forward.isWritable() && !aso.getPacketBuffer().isEmpty()) {
+            ByteBuf byteBuf = aso.getPacketBuffer().poll();
+            if (!sendOutboundPacket(forward, byteBuf)) {
+                // Explicitly release the packet we just polled so it doesn't leak memory!
+                ReferenceCountUtil.release(byteBuf);
+
+                // Wipe the rest of the queue since the connection is broken anyway
+                clearBufferQueue(aso);
                 break;
             }
         }
     }
 
-    private boolean sendOutboundPacket(Channel forward, DatagramPacket packet) {
+    private boolean sendOutboundPacket(Channel forward, ByteBuf byteBuf) {
+        // Scenario A: Channel died right before sending. Manually release the polled packet.
         if (forward == null || !forward.isActive()) {
-            ReferenceCountUtil.release(packet);
+            ReferenceCountUtil.release(byteBuf);
             this.state = SessionState.DISCONNECTED;
             return false;
         }
 
+        // Construct target outbound wrapper sharing the duplicated payload buffer
         DatagramPacket fwdPacket = new DatagramPacket(
-                packet.content(),
+                byteBuf,
                 (InetSocketAddress) forward.remoteAddress()
         );
 
+        // Scenario B: Netty asynchronously transfers bytes to the network layer.
+        // Netty automatically manages the release of fwdPacket (and its content) upon completion.
         forward.writeAndFlush(fwdPacket).addListener((ChannelFutureListener) future -> {
             if (!future.isSuccess()) {
-                future.channel().close();
                 this.state = SessionState.DISCONNECTED;
+                future.channel().close();
             }
         });
 
-        ReferenceCountUtil.release(packet);
         return true;
+    }
+
+    private void clearBufferQueue(Aso aso) {
+        ByteBuf byteBuf;
+        while ((byteBuf = aso.getPacketBuffer().poll()) != null) {
+            ReferenceCountUtil.release(byteBuf);
+        }
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        bus.asos.removeAsoByBind(ctx.channel());
+        Aso aso = bus.asos.getAsoByBind(ctx.channel());
+        if (aso != null) {
+            bus.asos.removeAsoByBind(ctx.channel());
+        }
         ctx.fireExceptionCaught(cause);
         ctx.close();
     }
 }
+
