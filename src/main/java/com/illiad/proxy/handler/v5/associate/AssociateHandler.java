@@ -91,15 +91,11 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         String prefix = bus.namer.getPrefix();
                         for (String name : pipeline.names()) {
                             if (name.startsWith(prefix)) {
-                                // Don't remove 'this' here if it matches the prefix; we handle it cleanly below
-                                if (!name.equals(pipeline.context(this).name())) {
-                                    pipeline.remove(name);
-                                }
+                                pipeline.remove(name);
                             }
                         }
 
                         // FIX: Safely pull out this specific setup handler last to avoid NoSuchElementException
-
                         pipeline.remove(this);
 
 
