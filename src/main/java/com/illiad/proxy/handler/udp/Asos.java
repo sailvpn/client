@@ -46,8 +46,8 @@ public class Asos {
      * Maps the newly connected upstream TCP control channel to the session registry.
      * Safely closes and evicts any hanging previous connections to ensure clean self-healing.
      */
-    public void bindFwdAssociate(Aso aso, Channel fwdAssociateChannel) {
-        if (aso == null || fwdAssociateChannel == null) return;
+    public void bindFwdAssociate(Aso aso, Channel fwdAssociate) {
+        if (aso == null || fwdAssociate == null) return;
 
         // 1. Fetch the previous connection leg reference
         Channel oldFwdAssociate = aso.getFwdAssociate();
@@ -56,21 +56,38 @@ public class Asos {
             fwdAssociateIndex.remove(oldFwdAssociate.id());
 
             // If it's still running or hanging in a half-dead state, force a clean close
-            if (oldFwdAssociate.isActive() || oldFwdAssociate.isOpen()) {
+            if (oldFwdAssociate.isOpen()) {
                 oldFwdAssociate.close();
             }
         }
 
         // 2. Bind the new active connection leg references cleanly
-        aso.setFwdAssociate(fwdAssociateChannel);
-        fwdAssociateIndex.put(fwdAssociateChannel.id(), aso);
+        aso.setFwdAssociate(fwdAssociate);
+        fwdAssociateIndex.put(fwdAssociate.id(), aso);
+    }
+
+    public void debindFwdAssociate(Aso aso, Channel fwdAssociate) {
+        if (aso != null && fwdAssociate != null) {
+            fwdAssociateIndex.remove(fwdAssociate.id());
+            aso.setFwdAssociate(null);
+            if (fwdAssociate.isOpen()) {
+                fwdAssociate.close();
+            }
+        }
     }
 
 
-    public void bindFwd(Aso aso, Channel forward) {
+    public void bindForward(Aso aso, Channel forward) {
         if (aso != null && forward != null) {
+            Channel oldFwd = aso.getForward();
             aso.setForward(forward);
             forwardIndex.put(forward.id(), aso);
+            if (oldFwd != null) {
+                forwardIndex.remove(oldFwd.id());
+                if (oldFwd.isOpen()) {
+                    oldFwd.close();
+                }
+            }
         }
     }
 
@@ -80,13 +97,6 @@ public class Asos {
             aso.setForward(null);
             if (forward.isOpen()) {
                 forward.close();
-            }
-            Channel fwdAssociate = aso.getFwdAssociate();
-            if (fwdAssociate != null) {
-                fwdAssociateIndex.remove(fwdAssociate.id());
-                if (fwdAssociate.isOpen()) {
-                    fwdAssociate.close();
-                }
             }
         }
     }
