@@ -1,5 +1,6 @@
 package com.illiad.proxy.handler.udp;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.util.ReferenceCountUtil;
@@ -19,7 +20,7 @@ public class Aso {
     private Channel forward;
 
     // A thread-safe queue to buffer packets while the upstream handshake is in-flight
-    private final Queue<DatagramPacket> packetBuffer = new ConcurrentLinkedQueue<>();
+    private final Queue<ByteBuf> packetBuffer = new ConcurrentLinkedQueue<>();
 
     private final AtomicBoolean cleaned = new AtomicBoolean(false);
 
@@ -37,7 +38,7 @@ public class Aso {
         }
 
         // Release any stashed buffers to prevent severe direct memory leaks
-        DatagramPacket bufferedPacket;
+        ByteBuf bufferedPacket;
         while ((bufferedPacket = packetBuffer.poll()) != null) {
             ReferenceCountUtil.release(bufferedPacket);
         }
