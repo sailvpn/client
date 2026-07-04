@@ -75,6 +75,11 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
                                     super.userEventTriggered(ctx, evt);
                                 }
                             }
+
+                            /**
+                             * CAUTION: implementing channelInactive() somehow caused the "UdpRelayHandler" to be
+                             * removed from binding UDP channel
+                             */
                         });
 
                         // FIX: Loop first to remove SOCKS5 protocol codecs while preserving Idle/Timeout handlers
