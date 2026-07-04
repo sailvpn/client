@@ -7,6 +7,7 @@ import com.illiad.proxy.codec.v5.V5ClientDecoder;
 import com.illiad.proxy.handler.udp.UdpRelayHandler;
 import com.illiad.proxy.handler.udp.SessionState;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -16,6 +17,7 @@ import io.netty.handler.codec.socksx.v5.Socks5CommandType;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.util.ReferenceCountUtil;
 
 /**
  * UDP_ASSOCIATE handler facing the upstream SOCKS5 server.
@@ -37,13 +39,12 @@ public class FwdAsoHandler extends ChannelInboundHandlerAdapter {
             // Fetch the overarching session tracker via the inbound UDP binding channel ID
             Aso aso = bus.asos.getAsoByBind(ctx.channel());
             if (aso == null) {
-                resetConnectingState(ctx.channel());
+                resetAndPurgeSession(ctx.channel(), null);
                 ctx.pipeline().remove(this);
                 return;
             }
 
             Bootstrap cb = new Bootstrap();
-
             // Reuses Netty's exact network context to map thread execution loops natively
             cb.group(ctx.channel().eventLoop())
                     .channel(NioSocketChannel.class)
@@ -57,8 +58,6 @@ public class FwdAsoHandler extends ChannelInboundHandlerAdapter {
 
             final Channel udpBindChannel = ctx.channel();
 
-            // FIX: Remove this setup trigger handler from the local UDP pipeline synchronously
-            // to leave the hot data loop completely clean for active traffic operations
             ctx.pipeline().remove(this);
 
             // Initiate the proxy connection using the clean bootstrap instance
@@ -66,8 +65,6 @@ public class FwdAsoHandler extends ChannelInboundHandlerAdapter {
                     .addListener((ChannelFutureListener) future -> {
                         if (future.isSuccess()) {
                             Channel ch = future.channel();
-
-                            // Encapsulated binding method that handles clearing and closing hanging sessions
                             bus.asos.bindFwdAssociate(aso, ch);
 
                             String sni = bus.params.getSni();
@@ -75,12 +72,10 @@ public class FwdAsoHandler extends ChannelInboundHandlerAdapter {
                                 sni = bus.params.getRemoteHost();
                             }
 
-                            // Flawlessly use native channel contexts for pooled buffer allocations
                             SslHandler sslHandler = bus.cert.sslCtx.newHandler(ch.alloc(), sni, bus.params.getRemotePort());
                             ChannelPipeline pipeline = ch.pipeline();
                             pipeline.addLast(sslHandler);
 
-                            // Add a listener for the SSL handshake completion
                             sslHandler.handshakeFuture().addListener(future1 -> {
                                 if (future1.isSuccess()) {
                                     DefaultSocks5CommandRequest asoReq = new DefaultSocks5CommandRequest(
@@ -91,59 +86,64 @@ public class FwdAsoHandler extends ChannelInboundHandlerAdapter {
                                     );
 
                                     // Assemble backend logic components inline
-                                    pipeline.addLast(new IdleStateHandler(0, 0, 60), new ChannelDuplexHandler() {
-                                                @Override
-                                                public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                                                    if (evt instanceof IdleStateEvent) {
-                                                        bus.asos.removeAsobyFwdAssociate(ctx.channel());
-                                                    } else {
-                                                        super.userEventTriggered(ctx, evt);
-                                                    }
-                                                }
+                                    pipeline.addFirst(new IdleStateHandler(0, 0, 60), new ChannelDuplexHandler() {
+                                        @Override
+                                        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                                            if (evt instanceof IdleStateEvent) {
+                                                bus.asos.debindFwdAssociate(aso, ctx.channel());
+                                                bus.asos.debindForward(aso, aso.getForward());
+                                            } else {
+                                                super.userEventTriggered(ctx, evt);
+                                            }
+                                        }
+                                    });
 
-                                                @Override
-                                                public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-                                                    bus.asos.removeAsobyFwdAssociate(ctx.channel());
-                                                    super.channelInactive(ctx);
-                                                }
-                                            }).addLast(bus.namer.generateName(), bus.v5ClientEncoder)
+                                    pipeline.addLast(bus.namer.generateName(), bus.v5ClientEncoder)
                                             .addLast(new PseudoResDecoder())
                                             .addLast(bus.namer.generateName(), new V5ClientDecoder(bus))
                                             .addLast(bus.namer.generateName(), new FwdAsoAckHandler(bus))
                                             .channel()
                                             .writeAndFlush(asoReq).addListener((ChannelFutureListener) future2 -> {
                                                 if (!future2.isSuccess()) {
-                                                    resetConnectingState(udpBindChannel);
-                                                    bus.asos.removeAsobyFwdAssociate(ch);
+                                                    resetAndPurgeSession(udpBindChannel, aso);
+                                                    bus.asos.debindFwdAssociate(aso, ch);
                                                 }
                                             });
                                 } else {
-                                    resetConnectingState(udpBindChannel);
-                                    bus.asos.removeAsobyFwdAssociate(ch);
+                                    resetAndPurgeSession(udpBindChannel, aso);
+                                    bus.asos.debindFwdAssociate(aso, ch);
                                 }
                             });
                         } else {
-                            resetConnectingState(udpBindChannel);
-                            aso.closeAll();
+                            resetAndPurgeSession(udpBindChannel, aso);
+                            bus.asos.debindFwdAssociate(aso, future.channel());
                         }
                     });
         } else {
-            // If any other unknown object passes through, propagate it down the pipeline untouched
+            // other unknown object passes through, propagate it down the pipeline untouched
             ctx.fireChannelRead(msg);
         }
     }
 
     /**
-     * Reaches back into the UDP data plane to revert state back to DISCONNECTED if a handshake fails.
+     * Reverts the UDP state machine safely and clears out cached packets
+     * to eliminate memory leaks and stale tracking buffers on handshake failure.
      */
-    private void resetConnectingState(Channel udpBindChannel) {
-        if (udpBindChannel != null && udpBindChannel.isOpen()) {
-            UdpRelayHandler relayHandler = udpBindChannel.pipeline().get(UdpRelayHandler.class);
-            if (relayHandler != null) {
-                relayHandler.setState(SessionState.DISCONNECTED);
+    private void resetAndPurgeSession(Channel udpBindChannel, Aso aso) {
+        if (aso != null) {
+            ByteBuf byteBuf;
+            while ((byteBuf = aso.getPacketBuffer().poll()) != null) {
+                ReferenceCountUtil.release(byteBuf);
             }
+        }
+
+        if (udpBindChannel != null && udpBindChannel.isOpen()) {
+            udpBindChannel.eventLoop().execute(() -> {
+                UdpRelayHandler relayHandler = (UdpRelayHandler) udpBindChannel.pipeline().get(bus.utils.UDP_RELAY_HANDLER);
+                if (relayHandler != null) {
+                    relayHandler.setState(SessionState.DISCONNECTED);
+                }
+            });
         }
     }
 }
-
-
