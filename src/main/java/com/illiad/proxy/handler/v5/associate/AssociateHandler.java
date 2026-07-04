@@ -38,7 +38,7 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
                 .handler(new ChannelInitializer<DatagramChannel>() {
                     @Override
                     protected void initChannel(DatagramChannel ch) {
-                        ch.pipeline().addLast(new UdpRelayHandler(bus));
+                        ch.pipeline().addLast(bus.utils.UDP_RELAY_HANDLER, new UdpRelayHandler(bus));
                     }
                 })
                 .bind(serverIp, bus.utils.IPV4_ZERO_PORT)
@@ -70,20 +70,10 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
                             public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
                                 if (evt instanceof IdleStateEvent) {
                                     // No traffic detected for 60 seconds, close the hung proxy tunnel
-                                    bus.utils.closeOnFlush(ctx.channel());
+                                    bus.asos.removeAsobyAssociate(ctx.channel());
                                 } else {
                                     super.userEventTriggered(ctx, evt);
                                 }
-                            }
-
-                            // Triggered when the TCP socket physically breaks or closes (FIN/RST)
-                            @Override
-                            public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-                                // Client disconnected -> Run the exact same cascading-close mechanism
-                                bus.asos.removeAsobyAssociate(ctx.channel());
-
-                                // Pass the event down the pipeline in case downstream handlers need it
-                                super.channelInactive(ctx);
                             }
                         });
 
@@ -94,10 +84,7 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
                                 pipeline.remove(name);
                             }
                         }
-
-                        // FIX: Safely pull out this specific setup handler last to avoid NoSuchElementException
                         pipeline.remove(this);
-
 
                     } else {
                         ctx.fireExceptionCaught(new Exception(bus.utils.associateFailed, future.cause()));
