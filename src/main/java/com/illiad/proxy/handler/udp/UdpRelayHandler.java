@@ -31,12 +31,11 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
     public void channelRead0(ChannelHandlerContext ctx, DatagramPacket packet) {
         Aso aso = bus.asos.getAsoByBind(ctx.channel());
         if (aso == null) {
-            return; // super(true) handles the inbound packet release automatically
+            ctx.fireExceptionCaught(new RuntimeException("UDPRelayHandler, Aso null... "));
+            return;
         }
 
         // always buffer current packet first
-        // Isolate reader/writer indexes and increase reference count for the FIFO queue buffer.
-        // This keeps payloads safe even after channelRead0 yields control back to Netty.
         aso.getPacketBuffer().add(packet.content().retainedDuplicate());
 
         try {
@@ -47,8 +46,9 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
             }
 
             // 2. Renew associate channel (TCP) idle timer
-            if (aso.getAssociate() != null && aso.getAssociate().isOpen()) {
-                aso.getAssociate().pipeline().fireUserEventTriggered(
+            Channel associate = aso.getAssociate();
+            if (associate != null && associate.isOpen()) {
+                associate.pipeline().fireUserEventTriggered(
                         IdleStateEvent.FIRST_ALL_IDLE_STATE_EVENT
                 );
             }
@@ -149,12 +149,7 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        Aso aso = bus.asos.getAsoByBind(ctx.channel());
-        if (aso != null) {
-            bus.asos.removeAsoByBind(ctx.channel());
-        }
         ctx.fireExceptionCaught(cause);
-        ctx.close();
     }
 }
 
