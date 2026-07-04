@@ -47,23 +47,23 @@ public class Asos {
      * Safely closes and evicts any hanging previous connections to ensure clean self-healing.
      */
     public void bindFwdAssociate(Aso aso, Channel fwdAssociate) {
-        if (aso == null || fwdAssociate == null) return;
 
-        // 1. Fetch the previous connection leg reference
-        Channel oldFwdAssociate = aso.getFwdAssociate();
-        if (oldFwdAssociate != null) {
-            // Remove its lookup tracking index immediately
-            fwdAssociateIndex.remove(oldFwdAssociate.id());
+        if (aso != null && fwdAssociate != null) {
+            // 1. Fetch the previous connection leg reference
+            Channel oldFwdAssociate = aso.getFwdAssociate();
+            // 2. Bind the new active connection leg references cleanly
+            aso.setFwdAssociate(fwdAssociate);
+            fwdAssociateIndex.put(fwdAssociate.id(), aso);
+            if (oldFwdAssociate != null) {
+                // Remove its lookup tracking index immediately
+                fwdAssociateIndex.remove(oldFwdAssociate.id());
 
-            // If it's still running or hanging in a half-dead state, force a clean close
-            if (oldFwdAssociate.isOpen()) {
-                oldFwdAssociate.close();
+                // If it's still running or hanging in a half-dead state, force a clean close
+                if (oldFwdAssociate.isOpen()) {
+                    oldFwdAssociate.close();
+                }
             }
         }
-
-        // 2. Bind the new active connection leg references cleanly
-        aso.setFwdAssociate(fwdAssociate);
-        fwdAssociateIndex.put(fwdAssociate.id(), aso);
     }
 
     public void debindFwdAssociate(Aso aso, Channel fwdAssociate) {
