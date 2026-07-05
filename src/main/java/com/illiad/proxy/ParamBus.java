@@ -28,7 +28,10 @@ public class ParamBus {
     public final Asos asos;
     public final Utils utils;
 
-    public ParamBus(Params params, HandlerNamer namer, V5ServerEncoder v5ServerEncoder, V5ClientEncoder v5ClientEncoder, V5AddressDecoder v5AddressDecoder, TokenManager tokenManager, Cert cert, Secret secret, Asos asos, Utils utils) {
+    public ParamBus(Params params, HandlerNamer namer, V5ServerEncoder v5ServerEncoder,
+                    V5ClientEncoder v5ClientEncoder, V5AddressDecoder v5AddressDecoder,
+                    TokenManager tokenManager, Cert cert, Secret secret,
+                    Asos asos, Utils utils) {
         this.params = params;
         this.namer = namer;
         this.v5ServerEncoder = v5ServerEncoder;
