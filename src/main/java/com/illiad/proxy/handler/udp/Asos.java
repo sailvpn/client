@@ -2,7 +2,9 @@ package com.illiad.proxy.handler.udp;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelId;
+import jakarta.annotation.PreDestroy;
 import org.springframework.stereotype.Component;
+
 import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -162,6 +164,26 @@ public class Asos {
 
         // Execute clean, non-leaking teardown of the entire session context
         aso.closeAll();
+    }
+
+    @PreDestroy
+    public void preDestroy() {
+        associateIndex.values().forEach(aso -> {
+            if (aso != null) aso.closeAll();
+        });
+        associateIndex.clear();
+        bindIndex.values().forEach(aso -> {
+            if (aso != null) aso.closeAll();
+        });
+        bindIndex.clear();
+        fwdAssociateIndex.values().forEach(aso -> {
+            if (aso != null) aso.closeAll();
+        });
+        fwdAssociateIndex.clear();
+        forwardIndex.values().forEach(aso -> {
+            if (aso != null) aso.closeAll();
+        });
+        forwardIndex.clear();
     }
 }
 
