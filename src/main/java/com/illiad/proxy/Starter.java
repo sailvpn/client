@@ -10,8 +10,6 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import jakarta.annotation.PostConstruct;
@@ -96,9 +94,7 @@ public class Starter {
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) {
-                        ch.pipeline().addLast(bus.namer.generateName(), new HttpServerCodec())
-                                .addLast(bus.namer.generateName(), new HttpObjectAggregator(10 * 1024 * 1024)) // 10MB limit
-                                .addLast(bus.namer.generateName(), new FrontHandler(bus));
+                        ch.pipeline().addLast(new FrontHandler(bus));
                     }
                 });
 
