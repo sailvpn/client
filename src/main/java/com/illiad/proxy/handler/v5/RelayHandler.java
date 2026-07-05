@@ -1,7 +1,6 @@
 package com.illiad.proxy.handler.v5;
 
 import com.illiad.proxy.ParamBus;
-import com.illiad.proxy.handler.Utils;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
