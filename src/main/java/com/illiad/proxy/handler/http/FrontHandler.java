@@ -248,7 +248,7 @@ public class FrontHandler extends ByteToMessageDecoder {
 
                         sslHandler.handshakeFuture().addListener(future1 -> {
                             if (future1.isSuccess()) {
-                                pipeline.addLast(new IdleStateHandler(0, 0, 60), new ChannelDuplexHandler() {
+                                pipeline.addFirst(new IdleStateHandler(0, 0, 60), new ChannelDuplexHandler() {
                                             @Override
                                             public void userEventTriggered(ChannelHandlerContext ctx1, Object evt) throws Exception {
                                                 if (evt instanceof IdleStateEvent) {
@@ -259,7 +259,7 @@ public class FrontHandler extends ByteToMessageDecoder {
                                             }
                                         })
                                         .addLast(new PseudoResDecoder())
-                                        .addLast(bus.namer.generateName(), bus.v5ServerEncoder)
+                                        .addLast(bus.namer.generateName(), bus.v5ClientEncoder)
                                         .addLast(bus.namer.generateName(), new V5ClientDecoder(bus))
                                         .addLast(bus.namer.generateName(), new Socks5AckHandler(ctx, bus))
                                         .channel()
