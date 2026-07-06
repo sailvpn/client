@@ -33,7 +33,7 @@ public class FrontHandler extends ByteToMessageDecoder {
         ON
     }
 
-    private static final byte[] TARGET_PATTERN = new byte[]{ 0x0D, 0x0A, 0x0D, 0x0A }; // "\r\n\r\n"
+    private static final byte[] TARGET_PATTERN = new byte[]{0x0D, 0x0A, 0x0D, 0x0A}; // "\r\n\r\n"
 
     private final ParamBus bus;
     private Channel outbound;
@@ -112,10 +112,10 @@ public class FrontHandler extends ByteToMessageDecoder {
             return true;
         }
 
-        public int getMatchCount() { return matchCount; }
+        public int getMatchCount() {
+            return matchCount;
+        }
     }
-
-    // CONTINUATION OF FRONTHANDLER CLASS FILE BODY (PART 2):
 
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
@@ -127,8 +127,6 @@ public class FrontHandler extends ByteToMessageDecoder {
                 outbound.writeAndFlush(data);
             } else {
                 in.skipBytes(in.readableBytes());
-                // Throwing an exception triggers your local exceptionCaught() block down the line,
-                // which handles closing the channels and frees off-heap buffers cleanly.
                 ctx.fireExceptionCaught(new ProxyConnectException(
                         "backend tunnel went inactive unexpectedly..."
                 ));
@@ -140,7 +138,8 @@ public class FrontHandler extends ByteToMessageDecoder {
         // Safely cache incoming byte frames without altering autoRead state
         if (state == TunnelState.CONNECTING) {
             if (in.readableBytes() > 0) {
-                earlyBytesBuffer.offer(in.readBytes(in.readableBytes()));
+                earlyBytesBuffer.offer(in.readBytes(in.readableBytes()).retain());
+                ctx.fireChannelReadComplete(); // Keeps Netty's stream allocation engine moving
             }
             return;
         }
@@ -150,22 +149,23 @@ public class FrontHandler extends ByteToMessageDecoder {
         int matchEndIndex = in.forEachByte(in.readerIndex(), in.readableBytes(), processor);
 
         if (processor.getMatchCount() < TARGET_PATTERN.length) {
-            return; // Incomplete framework boundary marker; let Netty continue to accumulate TCP chunks
+            return; // Incomplete boundary marker; let Netty continue to accumulate TCP chunks
         }
 
+        // Calculate total byte boundary size of the incoming HTTP header block
         int totalHeaderLength = (matchEndIndex - in.readerIndex()) + 1;
 
-        // Peek/slice out the header bytes cleanly from the stream without advancing reader index yet.
-        // For plaintext HTTP (GET/POST), we MUST forward the initial request down the tunnel later!
+        // Peek/slice out the header bytes cleanly from the stream without advancing reader index yet
         ByteBuf headerSlice = in.slice(in.readerIndex(), totalHeaderLength);
         String requestString = headerSlice.toString(CharsetUtil.UTF_8);
+        String lowerRequest = requestString.toLowerCase(java.util.Locale.ROOT);
 
         String targetHost = null;
-        int port = 80; // Default to 80 for plaintext HTTP, will override to 443 if CONNECT is detected
+        int port = -1; // Sentinel value to verify valid parsing step boundaries
 
         try {
-            // 1. Look for the standard "Host: " header (Reliable for GET, POST, FETCH, and CONNECT)
-            int hostIdx = requestString.indexOf("Host: ");
+            // 1. Robust Case-Insensitive evaluation of "host: "
+            int hostIdx = lowerRequest.indexOf("host: ");
             if (hostIdx != -1) {
                 int endLineIdx = requestString.indexOf("\r\n", hostIdx);
                 if (endLineIdx != -1) {
@@ -176,29 +176,43 @@ public class FrontHandler extends ByteToMessageDecoder {
                         port = Integer.parseInt(parts[1]);
                     } else {
                         targetHost = hostLine;
-                        // Set standard port footprint based on request signature if missing
-                        port = requestString.startsWith("CONNECT") ? 443 : 80;
                     }
                 }
             }
 
-            // 2. Fallback: Parse the first line directly if "Host: " header parsing missed
-            if (targetHost == null) {
-                int connectIdx = requestString.indexOf("CONNECT ");
-                if (connectIdx != -1) {
-                    port = 443; // Explicit HTTPS tunnel signature
-                    int spaceIdx = requestString.indexOf(" ", connectIdx + 8);
-                    if (spaceIdx != -1) {
-                        String hostPortPart = requestString.substring(connectIdx + 8, spaceIdx).trim();
-                        if (hostPortPart.contains(":")) {
-                            String[] parts = hostPortPart.split(":");
+            // 2. Fallback: Parse the raw HTTP Request-Line directly
+            int firstLineEnd = requestString.indexOf("\r\n");
+            if (firstLineEnd != -1) {
+                String firstLine = requestString.substring(0, firstLineEnd);
+                String[] tokens = firstLine.split("\\s+");
+
+                if (tokens.length >= 2) {
+                    String method = tokens[0].toUpperCase(java.util.Locale.ROOT);
+                    String uri = tokens[1];
+
+                    if ("CONNECT".equals(method)) {
+                        if (port == -1) port = 443; // Standard signature tracking profile
+                        if (uri.contains(":")) {
+                            String[] parts = uri.split(":");
                             targetHost = parts[0];
                             port = Integer.parseInt(parts[1]);
                         } else {
-                            targetHost = hostPortPart;
+                            targetHost = uri;
+                        }
+                    } else if (targetHost == null) {
+                        // Extract domain names out of absolute paths for standard HTTP requests
+                        if (uri.startsWith("http://") || uri.startsWith("https://")) {
+                            java.net.URI parsedUri = new java.net.URI(uri);
+                            targetHost = parsedUri.getHost();
+                            port = parsedUri.getPort();
                         }
                     }
                 }
+            }
+
+            // Final fallback validation step for default protocol configurations
+            if (port == -1) {
+                port = lowerRequest.startsWith("connect") ? 443 : 80;
             }
 
             if (targetHost == null || targetHost.isEmpty() || port < 0 || port > 65535) {
@@ -214,12 +228,64 @@ public class FrontHandler extends ByteToMessageDecoder {
         }
 
         // --- UNIFIED TUNNEL STATE SHIFT ---
-        this.isConnectMethod = requestString.startsWith("CONNECT");
+        this.isConnectMethod = lowerRequest.startsWith("connect");
         this.state = TunnelState.CONNECTING;
 
-        // Read ALL current bytes out of the stream accumulator (including the header we just parsed)
-        // and cache them in the FIFO queue so they can be flushed to the target later.
-        earlyBytesBuffer.offer(in.readBytes(in.readableBytes()));
+        if (this.isConnectMethod) {
+            // A. HTTPS CONNECT TRACK:
+            // 1. Skip over the proxy CONNECT header completely so it never reaches remote TLS engines
+            in.skipBytes(totalHeaderLength);
+
+            // 2. Pull out the trailing bytes (the binary TLS Client Hello) and place them FIRST into the FIFO queue
+            if (in.readableBytes() > 0) {
+                earlyBytesBuffer.offer(in.readBytes(in.readableBytes()).retain());
+            }
+        } else {
+            // B. PLAINTEXT HTTP TRACK (GET/POST/FETCH):
+            // 1. Normalize and pack headers into FIFO Position #1
+            int firstLineEnd = requestString.indexOf("\r\n");
+            String firstLine = requestString.substring(0, firstLineEnd);
+            String[] tokens = firstLine.split("\\s+");
+
+            if (tokens.length >= 2 && (tokens[1].startsWith("http://") || tokens[1].startsWith("https://"))) {
+                ByteBuf headerBuffer = ctx.alloc().buffer();
+                try {
+                    // Rewrite absolute path "GET http://sina.com.cn" -> relative path "GET /index.html"
+                    java.net.URI parsedUri = new java.net.URI(tokens[1]);
+                    String rawPath = parsedUri.getRawPath();
+                    String relativePath = (rawPath == null || rawPath.isEmpty()) ? "/" : rawPath;
+                    if (parsedUri.getRawQuery() != null) {
+                        relativePath += "?" + parsedUri.getRawQuery();
+                    }
+
+                    String newFirstLine = tokens[0] + " " + relativePath + " " + tokens[2] + "\r\n";
+                    headerBuffer.writeBytes(newFirstLine.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+                    in.skipBytes(firstLineEnd + 2); // Skip the absolute first line from input stream
+                    headerBuffer.writeBytes(in.readBytes(totalHeaderLength - (firstLineEnd + 2))); // Copy all other headers
+
+                    earlyBytesBuffer.offer(headerBuffer.retain()); // Headers offered first
+                } catch (Exception ex) {
+                    headerBuffer.release();
+                    in.skipBytes(in.readableBytes());
+                    ctx.close();
+                    return;
+                } finally {
+                    headerBuffer.release(); // Balance local instant tracking footprint allocation
+                }
+            } else {
+                // Verbatim safe fallback tracking execution allocation
+                earlyBytesBuffer.offer(in.readBytes(totalHeaderLength).retain());
+            }
+
+            // 2. Pull out trailing payload bytes (e.g. POST Body details) and place them SECOND into the FIFO queue
+            if (in.readableBytes() > 0) {
+                earlyBytesBuffer.offer(in.readBytes(in.readableBytes()).retain());
+            }
+        }
+
+        // 3. Freeze incoming kernel reads until our SOCKS channel establishes its connection handshake
+        // ctx.channel().config().setAutoRead(false);
 
         // --- CASCADING OUTBOUND HANDSHAKE BOOTSTRAP ---
         Socks5CommandRequest socksReq = new DefaultSocks5CommandRequest(
@@ -235,7 +301,8 @@ public class FrontHandler extends ByteToMessageDecoder {
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
-                    protected void initChannel(SocketChannel sc) {}
+                    protected void initChannel(SocketChannel sc) {
+                    }
                 });
 
         b.connect(bus.params.getRemoteHost(), bus.params.getRemotePort())
@@ -278,9 +345,10 @@ public class FrontHandler extends ByteToMessageDecoder {
                         });
                     } else {
                         clearEarlyBytesBuffer();
-                        bus.utils.closeOnFlush(future.channel());
                         bus.utils.closeOnFlush(ctx.channel());
                     }
                 });
     }
+
 }
+
