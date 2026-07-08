@@ -2,7 +2,6 @@ package com.illiad.proxy.handler.udp;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
-import io.netty.channel.socket.DatagramPacket;
 import io.netty.util.ReferenceCountUtil;
 import lombok.Data;
 
