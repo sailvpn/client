@@ -38,7 +38,7 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
                 .handler(new ChannelInitializer<DatagramChannel>() {
                     @Override
                     protected void initChannel(DatagramChannel ch) {
-                        ch.pipeline().addLast(bus.utils.UDP_RELAY_HANDLER, new UdpRelayHandler(bus));
+                        ch.pipeline().addLast(new UdpRelayHandler(bus));
                     }
                 })
                 .bind(serverIp, bus.utils.IPV4_ZERO_PORT)

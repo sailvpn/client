@@ -71,7 +71,7 @@ public class FwdAsoAckHandler extends SimpleChannelInboundHandler<Socks5CommandR
                                 if (bindChannel != null) {
                                     // SAFELY execute the pipeline state changes inside the native UDP Loop Thread
                                     bindChannel.eventLoop().execute(() -> {
-                                        UdpRelayHandler relayHandler = (UdpRelayHandler) bindChannel.pipeline().get(bus.utils.UDP_RELAY_HANDLER);
+                                        UdpRelayHandler relayHandler = bindChannel.pipeline().get(UdpRelayHandler.class);
                                         if (relayHandler != null) {
                                             relayHandler.setState(SessionState.CONNECTED);
                                             relayHandler.flushQueue(aso);
@@ -117,7 +117,7 @@ public class FwdAsoAckHandler extends SimpleChannelInboundHandler<Socks5CommandR
                     ReferenceCountUtil.release(byteBuf);
                 }
 
-                UdpRelayHandler relayHandler = (UdpRelayHandler) bindChannel.pipeline().get(bus.utils.UDP_RELAY_HANDLER);
+                UdpRelayHandler relayHandler = bindChannel.pipeline().get(UdpRelayHandler.class);
                 if (relayHandler != null) {
                     relayHandler.setState(SessionState.DISCONNECTED);
                 }

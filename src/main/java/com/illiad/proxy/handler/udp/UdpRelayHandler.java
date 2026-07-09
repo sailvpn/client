@@ -3,6 +3,7 @@ package com.illiad.proxy.handler.udp;
 import com.illiad.proxy.ParamBus;
 import com.illiad.proxy.handler.v5.forward.FwdAsoHandler;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.handler.timeout.IdleStateEvent;
@@ -47,10 +48,12 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
 
             // 2. Renew associate channel (TCP) idle timer
             Channel associate = aso.getAssociate();
-            if (associate != null && associate.isOpen()) {
-                associate.pipeline().fireUserEventTriggered(
-                        IdleStateEvent.FIRST_ALL_IDLE_STATE_EVENT
-                );
+            if (associate != null && associate.isActive()) {
+                associate.writeAndFlush(Unpooled.EMPTY_BUFFER);
+            }
+            Channel fwdAssociate = aso.getFwdAssociate();
+            if (fwdAssociate != null && fwdAssociate.isActive()) {
+                fwdAssociate.writeAndFlush(Unpooled.EMPTY_BUFFER);
             }
 
             // =================================================================

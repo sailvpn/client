@@ -28,7 +28,6 @@ public class Utils {
     public final String PROXY_AUTHENTICATE = "Proxy-Authenticate";
     public final String PROXY_CONNECTION = "Proxy-Connection";
     public final String UPSTREAM_SETUP = "bj5ku";
-    public final String UDP_RELAY_HANDLER = "tqfhkjdzs";
 
     /**
      * Closes the specified channel after all queued write requests are flushed.

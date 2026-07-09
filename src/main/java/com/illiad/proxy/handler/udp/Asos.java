@@ -121,7 +121,7 @@ public class Asos {
 
     public Aso removeAsoByBind(Channel bind) {
         if (bind == null) return null;
-        Aso aso = bindIndex.remove(bind.id());
+        Aso aso = bindIndex.get(bind.id());
         if (aso != null) {
             cleanIndexesAndClose(aso);
         }
@@ -130,7 +130,7 @@ public class Asos {
 
     public Aso removeAsobyAssociate(Channel associate) {
         if (associate == null) return null;
-        Aso aso = associateIndex.remove(associate.id());
+        Aso aso = associateIndex.get(associate.id());
         if (aso != null) {
             cleanIndexesAndClose(aso);
         }
@@ -139,7 +139,7 @@ public class Asos {
 
     public Aso removeAsobyFwdAssociate(Channel fwdAssociate) {
         if (fwdAssociate == null) return null;
-        Aso aso = fwdAssociateIndex.remove(fwdAssociate.id());
+        Aso aso = fwdAssociateIndex.get(fwdAssociate.id());
         if (aso != null) {
             cleanIndexesAndClose(aso);
         }
@@ -148,7 +148,7 @@ public class Asos {
 
     public Aso removeAsoBySource(InetSocketAddress source) {
         if (source == null) return null;
-        Aso aso = sourceIndex.remove(source);
+        Aso aso = sourceIndex.get(source);
         if (aso != null) {
             cleanIndexesAndClose(aso);
         }
