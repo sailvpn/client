@@ -47,9 +47,8 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
                         Channel bind = future.channel();
 
                         // Register the session to your high-performance thread-safe index
-                        if (!bus.asos.initAso(ctx.channel(), bind)) {
-                            ctx.fireExceptionCaught(new RuntimeException("Failed to initialize Aso"));
-                        }
+                        bus.asos.initAso(ctx.channel(), bind);
+
                         InetSocketAddress localAddr = (InetSocketAddress) bind.localAddress();
                         String host = localAddr.getHostString();
 
@@ -63,7 +62,6 @@ public class AssociateHandler extends SimpleChannelInboundHandler<Socks5CommandR
 
                         // Send success status back down the client TCP link
                         ctx.channel().writeAndFlush(response);
-
                         ChannelPipeline pipeline = ctx.pipeline();
                         pipeline.addLast(new IdleStateHandler(0, 0, 60), new ChannelDuplexHandler() {
                             @Override
