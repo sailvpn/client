@@ -139,7 +139,7 @@ public class FwdAsoHandler extends ChannelInboundHandlerAdapter {
 
         if (udpBindChannel != null && udpBindChannel.isOpen()) {
             udpBindChannel.eventLoop().execute(() -> {
-                UdpRelayHandler relayHandler = (UdpRelayHandler) udpBindChannel.pipeline().get(bus.utils.UDP_RELAY_HANDLER);
+                UdpRelayHandler relayHandler = udpBindChannel.pipeline().get(UdpRelayHandler.class);
                 if (relayHandler != null) {
                     relayHandler.setState(SessionState.DISCONNECTED);
                 }

@@ -2,6 +2,7 @@ package com.illiad.proxy.handler.udp;
 
 import com.illiad.proxy.ParamBus;
 
+import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.util.ReferenceCountUtil;
@@ -35,10 +36,13 @@ public class ResHandler extends SimpleChannelInboundHandler<DatagramPacket> {
 
                 // 1. FIX: Reset the Client TCP control connection idle timer on every incoming return packet.
                 // This ensures downloading heavy streams doesn't trigger an accidental idle timeout eviction.
-                if (aso.getAssociate() != null && aso.getAssociate().isOpen()) {
-                    aso.getAssociate().pipeline().fireUserEventTriggered(
-                            io.netty.handler.timeout.IdleStateEvent.FIRST_ALL_IDLE_STATE_EVENT
-                    );
+                Channel fwdAssociate = aso.getFwdAssociate();
+                if (fwdAssociate != null && fwdAssociate.isActive()) {
+                    fwdAssociate.writeAndFlush(Unpooled.EMPTY_BUFFER);
+                }
+                Channel associate = aso.getAssociate();
+                if (associate!= null && associate.isActive()) {
+                    associate.writeAndFlush(Unpooled.EMPTY_BUFFER);
                 }
 
                 // 2. FIX: Omit the local sender interface parameter to let the OS handle routing naturally.
