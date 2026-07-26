@@ -118,3 +118,4 @@ To ensure the script triggers silently in the background when Windows boots up:
 Console output streams (`stdout` and `stderr`) are automatically redirected to `app.log` in real time.
 * To monitor logs live in **Linux**: `tail -f app.log`
 * To monitor logs live in **Windows PowerShell**: `Get-Content app.log -Wait`
+
