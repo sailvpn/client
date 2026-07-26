@@ -1,16 +1,16 @@
-name: Build and Release
+name: Build and Cross-Platform Release
 
 on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch: # Allows you to manually trigger the build from GitHub if needed
+  workflow_dispatch:
 
 jobs:
-  build-and-release:
+  build-universal-package:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Crucial permission allowing the action to create a release
+      contents: write
 
     steps:
       - name: Checkout code
@@ -21,17 +21,38 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle' # Caches dependencies to speed up future runs
+          cache: 'gradle'
 
       - name: Make Gradle Wrapper Executable
-        run: chmod +x gradlew
+        run: chmod +x ./gradlew
 
-      - name: Build with Gradle
-        run: ./gradlew bootJar -x test # 'bootJar' packages the executable Spring Boot JAR, '-x test' skips tests for speed
+      - name: Build Fat JAR
+        run: ./gradlew bootJar -x test
+
+      - name: Prepare Universal Package Directory
+        run: |
+          mkdir -p release-payload
+          # Copy the compiled Gradle boot jar into the payload directory
+          cp build/libs/*.jar release-payload/app.jar
+          
+          # 1. Create Windows Launch Script (.bat)
+          echo '@echo off' > release-payload/run-windows.bat
+          echo 'java -jar app.jar' >> release-payload/run-windows.bat
+          
+          # 2. Create Linux & macOS Launch Script (.sh)
+          echo '#!/bin/sh' > release-payload/run-unix.sh
+          echo 'java -jar app.jar' >> release-payload/run-unix.sh
+          chmod +x release-payload/run-unix.sh
+
+      - name: Compress Bundle into Zip
+        run: |
+          cd release-payload
+          zip -r ../spring-app-universal.zip *
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: build/libs/*.jar
+          files: spring-app-universal.zip
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Automatically provided by GitHub
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
