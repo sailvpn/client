@@ -31,18 +31,21 @@ jobs:
 
       - name: Prepare Universal Package Directory
         run: |
+          # Create a temporary directory for the final package payload
           mkdir -p release-payload
-          # Copy the compiled Gradle boot jar into the payload directory
+          
+          # 1. Copy the compiled Gradle boot jar into the payload directory
           cp build/libs/*.jar release-payload/app.jar
           
-          # 1. Create Windows Launch Script (.bat)
-          echo '@echo off' > release-payload/run-windows.bat
-          echo 'java -jar app.jar' >> release-payload/run-windows.bat
+          # 2. Copy the 5 requested files from the repository root
+          cp LICENSE release-payload/
+          cp README.md release-payload/
+          cp sail.bat release-payload/
+          cp sail.sh release-payload/
+          cp sail.service release-payload/
           
-          # 2. Create Linux & macOS Launch Script (.sh)
-          echo '#!/bin/sh' > release-payload/run-unix.sh
-          echo 'java -jar app.jar' >> release-payload/run-unix.sh
-          chmod +x release-payload/run-unix.sh
+          # 3. Ensure the Linux/macOS shell script retains executable permissions
+          chmod +x release-payload/sail.sh
 
       - name: Compress Bundle into Zip
         run: |
@@ -55,4 +58,3 @@ jobs:
           files: spring-app-universal.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
