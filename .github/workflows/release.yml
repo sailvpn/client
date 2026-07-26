@@ -38,17 +38,19 @@ jobs:
           # This matches the JAR_NAME="app.jar" expected by both sail.sh and sail.bat
           cp build/libs/*.jar release-payload/app.jar
           
-          # 3. Copy your 5 requested files from the repository root
+          # 3. Copy your 6 requested files from the repository root
           cp LICENSE release-payload/
           cp README.md release-payload/
           cp sail.bat release-payload/
           cp sail.sh release-payload/
           cp sail.service release-payload/
+          cp application.properties.txt release-payload/
           
           # 4. CRITICAL Cross-Platform Step: Format line endings for target platforms
-          # Convert sail.sh and sail.service to Unix format (LF) to prevent execution and parsing errors
+          # Convert sail.sh, sail.service, and configuration templates to Unix format (LF)
           sed -i 's/\r$//' release-payload/sail.sh
           sed -i 's/\r$//' release-payload/sail.service
+          sed -i 's/\r$//' release-payload/application.properties.txt
           
           # Convert sail.bat to Windows format (CRLF) to guarantee it doesn't break if checked out on Linux
           sed -i 's/$/\r/' release-payload/sail.bat
