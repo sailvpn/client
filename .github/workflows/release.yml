@@ -68,5 +68,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: spring-app-universal.zip
+          # If triggered by a tag push, use that tag. If triggered manually, fall back to 'manual-latest'
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'manual-latest' }}
+          name: ${{ github.ref_type == 'tag' && github.ref_name || 'Manual Pre-Release' }}
+          draft: false
+          # Marks manual runs as a Pre-release on GitHub so it doesn't overwrite your official stable release flags
+          prerelease: ${{ github.ref_type != 'tag' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Automatically injected by GitHub to authenticate the upload
