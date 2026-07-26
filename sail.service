@@ -8,11 +8,12 @@ Type=forking
 User=myuser
 # The exact directory where your script and JAR are located
 WorkingDirectory=/home/myuser/apps/myapp
-# Systemd natively manages logs, but we point to your start/stop scripts
-ExecStart=/home/myuser/apps/myapp/manage_app.sh start
-ExecStop=/home/myuser/apps/myapp/manage_app.sh stop
+# Systemd natively manages logs, pointing directly to your background script
+ExecStart=/home/myuser/apps/myapp/sail.sh start
+ExecStop=/home/myuser/apps/myapp/sail.sh stop
 # Automatically restart the app if it crashes unexpectedly
 Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
+

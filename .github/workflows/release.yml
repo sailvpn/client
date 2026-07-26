@@ -3,14 +3,14 @@ name: Build and Cross-Platform Release
 on:
   push:
     tags:
-      - 'v*'
-  workflow_dispatch:
+      - 'v*' # Triggers the workflow automatically when you push a tag starting with 'v' (e.g., v1.0.0)
+  workflow_dispatch: # Allows you to manually trigger the build from the GitHub Actions tab
 
 jobs:
   build-universal-package:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # Crucial permission allowing the action to create a release and upload assets
 
     steps:
       - name: Checkout code
@@ -21,30 +21,40 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
+          cache: 'gradle' # Automatically caches Gradle dependencies to drastically speed up future runs
 
       - name: Make Gradle Wrapper Executable
         run: chmod +x ./gradlew
 
       - name: Build Fat JAR
-        run: ./gradlew bootJar -x test
+        run: ./gradlew bootJar -x test # Generates the Spring Boot executable JAR and skips tests for speed
 
       - name: Prepare Universal Package Directory
         run: |
-          # Create a temporary directory for the final package payload
+          # 1. Create a clean, temporary directory for the final package payload
           mkdir -p release-payload
           
-          # 1. Copy the compiled Gradle boot jar into the payload directory
+          # 2. Copy and rename the compiled Gradle boot jar into the payload directory
+          # This matches the JAR_NAME="app.jar" expected by both sail.sh and sail.bat
           cp build/libs/*.jar release-payload/app.jar
           
-          # 2. Copy the 5 requested files from the repository root
+          # 3. Copy your 5 requested files from the repository root
           cp LICENSE release-payload/
           cp README.md release-payload/
           cp sail.bat release-payload/
           cp sail.sh release-payload/
           cp sail.service release-payload/
           
-          # 3. Ensure the Linux/macOS shell script retains executable permissions
+          # 4. CRITICAL Cross-Platform Step: Format line endings for target platforms
+          # Convert sail.sh and sail.service to Unix format (LF) to prevent execution and parsing errors
+          sed -i 's/\r$//' release-payload/sail.sh
+          sed -i 's/\r$//' release-payload/sail.service
+          
+          # Convert sail.bat to Windows format (CRLF) to guarantee it doesn't break if checked out on Linux
+          sed -i 's/$/\r/' release-payload/sail.bat
+          sed -i 's/\r\r$/\r/' release-payload/sail.bat # Sanity check to prevent double carriage returns (\r\r\n)
+          
+          # 5. Ensure the Linux/macOS shell script retains executable permissions inside the package
           chmod +x release-payload/sail.sh
 
       - name: Compress Bundle into Zip
@@ -57,4 +67,4 @@ jobs:
         with:
           files: spring-app-universal.zip
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Automatically injected by GitHub to authenticate the upload
