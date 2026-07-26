@@ -1,12 +1,12 @@
-# Java Application Management Scripts
+# Sail Application Management Scripts
 
-This repository contains robust production-grade scripts designed to manage a Java JAR application as a background service. It supports starting, stopping, checking operational status, and configuring automatic system boot management.
+This repository contains robust production-grade scripts designed to manage Sail application as a background service. It supports starting, stopping, checking operational status, and configuring automatic system boot management.
 
 ## 📦 Repository Structure
-* `sail.sh` - Unified management script for **Linux** and **macOS** environments.
-* `sail.bat` - Unified management script for **Windows** environments.
+* `sail.sh` - management script for **Linux** and **macOS** environments.
+* `sail.bat` - management script for **Windows** environments.
 * `sail.service` - Pre-configured Systemd service unit template file for **Linux**.
-* `app.jar` - Your compiled Java application.
+* `app.jar` - Java application.
 * `app.log` - Dynamically generated runtime application log file.
 * `app.pid` - Dynamically generated Linux/macOS Process ID tracking file.
 
