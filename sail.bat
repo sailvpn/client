@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 :: Configuration
-set "JAR_NAME=my_app.jar"
+set "JAR_NAME=app.jar"
 set "APP_TITLE=my_java_app_title"
 set "LOG_FILE=app.log"
 

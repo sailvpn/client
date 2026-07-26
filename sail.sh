@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-JAR_NAME="my_app.jar"
+JAR_NAME="app.jar"
 PID_FILE="app.pid"
 
 case "$1" in
