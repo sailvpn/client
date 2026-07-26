@@ -1,28 +1,75 @@
-spring.application.name=proxy
-proxy.ssl.cert-path=./certs/ca.crt
+# ===================================================================
+# Remote Server Connection
+# ===================================================================
+params.remoteHost=your-server.com
+params.remotePort=443
+params.sni=example.test
 
-# JWT Authentication Configuration
-# To use JWT authentication with the remote server:
-# 1. Set params.crypto=JWT
-# 2. Choose a token mode:
+# ===================================================================
+# Local Proxy Ports
+# ===================================================================
+params.localPort=2080
+params.httpPort=9999
+params.localHost=127.0.0.1
+
+# ===================================================================
+# Application Core Parameters & Constraints
+# ===================================================================
+
+# File paths to infrastructure assets
+params.certPath=./ca.crt
+# JWT token file path, this file contains the JWT token, the conent of the file will be updated automatically in case of automatic mode.
+
+# ATTENTION, only one Token is valid at a time, if you create a token, all prervious ones will be invalidated.
+# IMPORTANT in the case of multiple devices, if you set "AUTO" mode on one device. all other devices will be invalidated once that toekn is updated.
+
+params.jwtTokenFile=./token.jwt
+
+
+# ===================================================================
+# OPTION 1: Anonymity MODE
+# ===================================================================
+# in this mode, you will generate JWT RSA token from the Sail web portal, and copy the token to the file defined in 'params.jwtTokenFile'
+# you can use the same token across multiple devices, and it will be valid until it expires.
+# the token contains a temporary one-time id, and quota about the service(amount of bytes to be transported).
+# it is 100% anonymous, the server and the client knows NOTHING(0) about you
+
+# Crypto engine name to use
+# params.crypto=JWT2
+
+# ===================================================================
+# OPTION 2: AUTOMATIC MODE (Single User/Device)
+# ===================================================================
+# The client will automatically acquire and renew JWT tokens
+
+# Crypto engine name to use
+params.crypto=JWT
+
+# you get your username and password from Sail's web portal, you can use them to acquire a new token ("AUTO" mode) for your device.
+# if you do not want expose your username and password. you can go to Sail's web portal, login,
+# and generate a new token for all devices you want to use.
+
+params.tokenMode=AUTO
+params.username=alice
+params.password=SecurePassword123!
+
+# Token settings (automatic mode)
+params.expireMins=60                    # 60 minutes
+params.renewInterval=10                    # Automatically renew in 10 minutes
+
+# ===================================================================
+# OPTION 3: MANUAL MODE (Multiple Devices / Family Sharing)
+# ===================================================================
+# Uncomment these lines to switch your configuration to manual token injection mode instead
+
+# Crypto engine name to use
+# params.crypto=JWT
+# params.tokenMode=MANUAL
 #
-# AUTOMATIC MODE (recommended for single user/device):
-#   params.crypto=JWT
-#   params.tokenMode=auto
-#   params.username=alice
-#   params.password=SecurePassword123!
-#   params.remoteHost=your-server.com
-#   params.remotePort=443
-#
-# MANUAL MODE (for sharing tokens across devices/family):
-#   params.crypto=JWT
-#   params.tokenMode=manual
-#   params.jwtToken=eyJhbGciOiJIUzI1NiJ9...
-#   params.remoteHost=your-server.com
-#   params.remotePort=443
-#
-# Token management settings (optional):
-#   params.tokenExpirationMinutes=43200        # 30 days (default)
-#   params.tokenRenewalEnabled=true            # Enable automatic renewal (default: true, auto mode only)
-#   params.tokenRenewalIntervalMinutes=10      # Renew every 10 minutes (default: 10, auto mode only)
+# Manual mode behavior:
+# - Disables automatic acquisition and auto-renewal (prevents disrupting other devices)
+# - The same static token payload can be manually shared across unlimited devices
+# - Ideal choice for family sharing architectures
+# - Ensure you update the target file defined in 'params.jwtTokenFile' before expiration
+
 
