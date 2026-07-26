@@ -19,33 +19,81 @@ The application automatically reads configuration parameters from an external fi
 
 ### Configuration Template (`application.properties`)
 ```properties
-# Network & Port Bindings
-params.localPort=3080
-params.localHost=127.0.0.1
-params.httpPort=9999
-params.remoteHost=127.0.0.1
-params.remotePort=5001
-
-# Application Parameters & Constraints
+# ===================================================================
+# Remote Server Connection
+# ===================================================================
+params.remoteHost=your-server.com
+params.remotePort=443
 params.sni=example.test
 
+# ===================================================================
+# Local Proxy Ports
+# ===================================================================
+# local SOCKS5 port, no username/password needed
+params.localPort=2080
+# local HTTP/HTTPS port, blind forward
+params.httpPort=9999
+params.localHost=127.0.0.1
 
-# Paths to Critical Assets
+# ===================================================================
+# Application Core Parameters & Constraints
+# ===================================================================
+
+# File paths to infrastructure assets
 params.certPath=./ca.crt
+# JWT token file path, this file contains the JWT token, the conent of the file will be updated automatically in case of automatic mode.
+# ATTENTION, only one Token is valid at a time, if you create a token, all prervious ones will be invalidated.
 params.jwtTokenFile=./token.jwt
 
-# JWT Authentication Credentials
-params.username=alice
-params.password=Password123
+# ===================================================================
+# OPTION 1: Anonymity MODE
+# ===================================================================
+# in this mode, you will generate JWT RSA token from the Sail web portal, and copy the token to the file defined in 'params.jwtTokenFile'
+# you can use the same token across multiple devices, and it will be valid until it expires.
+# the token contains a temporary one-time id, and quota about the service(amount of bytes to be transported).
+# it is 100% anonymous, the server and the client knows NOTHING about you
 
-# Token Modes and Lifecycle Intervals
+# Crypto engine name to use
+# params.crypto=JWT2
+
+# ===================================================================
+# OPTION 2: AUTOMATIC MODE (Single User/Device)
+# ===================================================================
+# The client will automatically acquire and renew JWT tokens
+
+# Crypto engine name to use
+params.crypto=JWT
+
+# IMPORTANT in the case of multiple devices, if you set "AUTO" mode on one device. all other devices will be invalidated once that token is updated.
 params.tokenMode=AUTO
-params.expireMins=30
-params.renewInterval=5
+
+# you get your username and password from Sail's web portal, you can use them to acquire a new token ("AUTO" mode) for your device.
+# if you do not want to expose your username and password. you can go to Sail's web portal, login,
+# and generate a new token for all devices you want to use.
+params.username=alice
+params.password=SecurePassword123!
+
+# Token settings (automatic mode)
+params.expireMins=60                    # 60 minutes
+params.renewInterval=10                    # Automatically renew in 10 minutes
+
+# ===================================================================
+# OPTION 3: MANUAL MODE (Multiple Devices / Family Sharing)
+# ===================================================================
+# Uncomment these lines to switch your configuration to manual token injection mode instead
+
+# Crypto engine name to use
+# params.crypto=JWT
+# params.tokenMode=MANUAL
+#
+# Manual mode behavior:
+# - Disables automatic acquisition and auto-renewal (prevents disrupting other devices)
+# - The same static token payload can be manually shared across unlimited devices
+# - Ideal choice for family sharing architectures
+# - Ensure you update the target file defined in 'params.jwtTokenFile' before expiration
 ```
 
-> ⚠️ **Important Constraint**: The parameter `params.max` accepts a maximum structural threshold value of `128`. Exceeding this boundary configuration may impact memory bounds or stream stability.
-
+> ⚠️ **Important Constraint**: in the case of multiple devices, if you set "AUTO" mode on one device. all other devices will be invalidated once that token is updated.
 ---
 
 ## 🐧 Linux & macOS Deployment & Usage
