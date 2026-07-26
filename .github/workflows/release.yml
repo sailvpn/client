@@ -62,12 +62,12 @@ jobs:
       - name: Compress Bundle into Zip
         run: |
           cd release-payload
-          zip -r ../spring-app-universal.zip *
+          zip -r ../sail.zip *
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: spring-app-universal.zip
+          files: sail.zip
           # If triggered by a tag push, use that tag. If triggered manually, fall back to 'manual-latest'
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'manual-latest' }}
           name: ${{ github.ref_type == 'tag' && github.ref_name || 'Manual Pre-Release' }}
