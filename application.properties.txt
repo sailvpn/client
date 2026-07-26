@@ -21,7 +21,7 @@ params.certPath=./ca.crt
 # JWT token file path, this file contains the JWT token, the conent of the file will be updated automatically in case of automatic mode.
 
 # ATTENTION, only one Token is valid at a time, if you create a token, all prervious ones will be invalidated.
-# IMPORTANT in the case of multiple devices, if you set "AUTO" mode on one device. all other devices will be invalidated once that toekn is updated.
+# IMPORTANT in the case of multiple devices, if you set "AUTO" mode on one device. all other devices will be invalidated once that token is updated.
 
 params.jwtTokenFile=./token.jwt
 
@@ -32,7 +32,7 @@ params.jwtTokenFile=./token.jwt
 # in this mode, you will generate JWT RSA token from the Sail web portal, and copy the token to the file defined in 'params.jwtTokenFile'
 # you can use the same token across multiple devices, and it will be valid until it expires.
 # the token contains a temporary one-time id, and quota about the service(amount of bytes to be transported).
-# it is 100% anonymous, the server and the client knows NOTHING(0) about you
+# it is 100% anonymous, the server and the client knows NOTHING about you
 
 # Crypto engine name to use
 # params.crypto=JWT2

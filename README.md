@@ -1,14 +1,50 @@
 # Sail Application Management Scripts
 
-This repository contains robust production-grade scripts designed to manage Sail application as a background service. It supports starting, stopping, checking operational status, and configuring automatic system boot management.
+This repository contains robust production-grade scripts designed to manage a Java JAR application as a background service. It supports starting, stopping, checking operational status, and configuring automatic system boot management.
 
 ## 📦 Repository Structure
 * `sail.sh` - management script for **Linux** and **macOS** environments.
 * `sail.bat` - management script for **Windows** environments.
 * `sail.service` - Pre-configured Systemd service unit template file for **Linux**.
+* `application.properties.txt` - External template configuration file.
 * `app.jar` - Java application.
 * `app.log` - Dynamically generated runtime application log file.
 * `app.pid` - Dynamically generated Linux/macOS Process ID tracking file.
+
+---
+
+## ⚙️ External Configuration (Spring Properties)
+
+The application automatically reads configuration parameters from an external file. To configure your settings without modifying or rebuilding the compiled JAR, duplicate or rename `application.properties.txt` to exactly `application.properties` in the same directory as `app.jar`.
+
+### Configuration Template (`application.properties`)
+```properties
+# Network & Port Bindings
+params.localPort=3080
+params.localHost=127.0.0.1
+params.httpPort=9999
+params.remoteHost=127.0.0.1
+params.remotePort=5001
+
+# Application Parameters & Constraints
+params.sni=example.test
+
+
+# Paths to Critical Assets
+params.certPath=./ca.crt
+params.jwtTokenFile=./token.jwt
+
+# JWT Authentication Credentials
+params.username=alice
+params.password=Password123
+
+# Token Modes and Lifecycle Intervals
+params.tokenMode=AUTO
+params.expireMins=30
+params.renewInterval=5
+```
+
+> ⚠️ **Important Constraint**: The parameter `params.max` accepts a maximum structural threshold value of `128`. Exceeding this boundary configuration may impact memory bounds or stream stability.
 
 ---
 
@@ -118,4 +154,3 @@ To ensure the script triggers silently in the background when Windows boots up:
 Console output streams (`stdout` and `stderr`) are automatically redirected to `app.log` in real time.
 * To monitor logs live in **Linux**: `tail -f app.log`
 * To monitor logs live in **Windows PowerShell**: `Get-Content app.log -Wait`
-
