@@ -13,9 +13,10 @@ This repository contains robust production-grade scripts designed to manage a Ja
 
 ---
 
-## ⚙️ External Configuration (Spring Properties)
+## ⚙️ Configure Application Properties
+The application requires a configuration file named `application.properties` to operate correctly. This file should be located in the same directory as `app.jar`.
 
-The application automatically reads configuration parameters from an external file. To configure your settings without modifying or rebuilding the compiled JAR, duplicate or rename `application.properties.txt` to exactly `application.properties` in the same directory as `app.jar`.
+Duplicate or rename `application.properties.txt` to exactly `application.properties` in the same directory as `app.jar`.
 
 ### Configuration Template (`application.properties`)
 ```properties
@@ -67,9 +68,9 @@ params.crypto=JWT
 # IMPORTANT in the case of multiple devices, if you set "AUTO" mode on one device. all other devices will be invalidated once that token is updated.
 params.tokenMode=AUTO
 
-# you get your username and password from Sail's web portal, you can use them to acquire a new token ("AUTO" mode) for your device.
+# you get your username and password from Sail's web portal.
 # if you do not want to expose your username and password. you can go to Sail's web portal, login,
-# and generate a new token for all devices you want to use.
+# and generate a token for all devices you want to use.
 params.username=alice
 params.password=SecurePassword123!
 
