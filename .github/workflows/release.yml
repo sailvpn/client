@@ -44,7 +44,7 @@ jobs:
           cp sail.bat release-payload/
           cp sail.sh release-payload/
           cp sail.service release-payload/
-          cp application.properties.txt release-payload/
+          cp application.properties.txt release-payload/application.properties
           
           # 4. CRITICAL Cross-Platform Step: Format line endings for target platforms
           # Convert sail.sh, sail.service, and configuration templates to Unix format (LF)

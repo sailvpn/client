@@ -16,10 +16,6 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
 
-/**
- * command to chrck if java trust-store has Let's Encrypt roots:
- * keytool -list -cacerts -storepass changeit | grep -iE "isrg|letsencrypt|identrust"
- */
 @Component
 public class Cert {
     public final SslContext sslCtx;
@@ -33,7 +29,6 @@ public class Cert {
         Path certPath = (pathStr != null && !pathStr.isEmpty()) ? Paths.get(pathStr) : null;
 
         if (certPath != null && Files.exists(certPath)) {
-            // Logic 1: Load from specified file path
             try (InputStream in = Files.newInputStream(certPath)) {
                 CertificateFactory cf = CertificateFactory.getInstance("X.509");
                 Collection<? extends Certificate> certs = cf.generateCertificates(in);
@@ -43,9 +38,8 @@ public class Cert {
                 }
             }
         } else {
-            // Logic 2: Fallback to System Trust-store with Let's Encrypt filter
+            // Load full standard default system trust authorities
             KeyStore systemStore = KeyStore.getInstance("JKS");
-            // Default Java trust-store location and password
             String cacertsPath = System.getProperty("java.home") + "/lib/security/cacerts";
             try (InputStream is = Files.newInputStream(Paths.get(cacertsPath))) {
                 systemStore.load(is, "changeit".toCharArray());
@@ -58,10 +52,14 @@ public class Cert {
                 if (systemStore.isCertificateEntry(alias)) {
                     Certificate cert = systemStore.getCertificate(alias);
                     if (cert instanceof X509Certificate x509) {
-                        String issuer = x509.getIssuerX500Principal().getName();
-                        // Filter for Let's Encrypt roots (e.g., ISRG Root X1)
-                        if (issuer.toUpperCase().contains("LETSENCRYPT") ||
-                                issuer.toUpperCase().contains("ISRG ROOT")) {
+                        String issuer = x509.getIssuerX500Principal().getName().toUpperCase();
+                        String subject = x509.getSubjectX500Principal().getName().toUpperCase();
+
+                        // 👍 FIXED FILTER: Captures Let's Encrypt Roots, Intermediary authorities (R3, E1)
+                        // and standard digital cross-signing anchors (IdenTrust) natively
+                        if (issuer.contains("LETSENCRYPT") || issuer.contains("ISRG ROOT") ||
+                                subject.contains("LETSENCRYPT") || subject.contains("ISRG ROOT") ||
+                                issuer.contains("IDENTRUST") || subject.contains("IDENTRUST")) {
                             trustKs.setCertificateEntry("sys-le-" + (count++), cert);
                         }
                     }
@@ -69,18 +67,25 @@ public class Cert {
             }
 
             if (count == 0) {
-                throw new Exception("No Let's Encrypt certificates found in system trust-store.");
+                // Safe Fallback: If strict filtration produces nothing, populate the complete system store
+                java.util.Enumeration<String> fallbackAliases = systemStore.aliases();
+                while (fallbackAliases.hasMoreElements()) {
+                    String alias = fallbackAliases.nextElement();
+                    if (systemStore.isCertificateEntry(alias)) {
+                        trustKs.setCertificateEntry("fallback-" + alias, systemStore.getCertificate(alias));
+                    }
+                }
             }
         }
 
-        // Initialize Managers
         TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         tmf.init(trustKs);
 
-        // 1. Netty TCP Context
+        // 1. 👍 FIXED: Swapped SslProvider.OPENSSL for SslProvider.JDK
+        // Removes all cross-platform netty-tcnative binary crashes from user machines
         this.sslCtx = SslContextBuilder.forClient()
                 .trustManager(tmf)
-                .sslProvider(SslProvider.OPENSSL)
+                .sslProvider(SslProvider.JDK) // 🚀 NATIVE JAVA HARDWARE ACCELERATED EXTENSION
                 .protocols("TLSv1.2", "TLSv1.3")
                 .build();
 

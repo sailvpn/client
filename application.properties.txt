@@ -1,27 +1,40 @@
 # ===================================================================
 # Remote Server Connection
 # ===================================================================
-params.remoteHost=your-server.com
-params.remotePort=443
+
+# The remote host is the VPN server address, it can be an IP address or a domain name.
+# if you know the IP address of the server, using IP address might speed up the connection.
+params.remoteHost=vpn IP address or domain name
+
+# sni is the same as the domain name of the server, it is used for TLS SNI extension
+# when you use IP address for params.remoteHost", you must set this to the domain name.
 params.sni=example.test
+
+# do no touch this port, it is the default port for the Sail service.
+params.remotePort=443
 
 # ===================================================================
 # Local Proxy Ports
 # ===================================================================
 # local SOCKS5 port, no username/password needed
-params.localPort=2080
+params.localPort=1080
+
 # local HTTP/HTTPS port, blind forward
-params.httpPort=9999
+params.httpPort=8080
+
+# local host address
 params.localHost=127.0.0.1
 
 # ===================================================================
 # Application Core Parameters & Constraints
 # ===================================================================
 
-# File paths to infrastructure assets
+# Path to the CA certificate file, leave it as it is unless you know what you are doing.
 params.certPath=./ca.crt
-# JWT token file path, this file contains the JWT token, the conent of the file will be updated automatically in case of automatic mode.
-# ATTENTION, only one Token is valid at a time, if you create a token, all prervious ones will be invalidated.
+
+# JWT token file path, this file contains the JWT token.
+# if you are not using JWT AUTO mode, you must manually copy your token to this file.
+# ATTENTION, only one Token is valid at a time, if you create a token, all previous ones will be invalidated.
 params.jwtTokenFile=./token.jwt
 
 # ===================================================================
@@ -52,9 +65,15 @@ params.tokenMode=AUTO
 params.username=alice
 params.password=SecurePassword123!
 
+# ====================================
 # Token settings (automatic mode)
-params.expireMins=60                    # 60 minutes
-params.renewInterval=10                    # Automatically renew in 10 minutes
+# =====================================
+
+# token expiration time in minutes, the client will automatically renew the token before it expires
+params.expireMins=60
+
+# token renewal interval in minutes, the client will automatically renew the token every 10 minutes
+params.renewInterval=10
 
 # ===================================================================
 # OPTION 3: MANUAL MODE (Multiple Devices / Family Sharing)
@@ -67,7 +86,7 @@ params.renewInterval=10                    # Automatically renew in 10 minutes
 #
 # Manual mode behavior:
 # - Disables automatic acquisition and auto-renewal (prevents disrupting other devices)
-# - The same static token payload can be manually shared across unlimited devices
+# - The same static token can be manually shared across unlimited devices
 # - Ideal choice for family sharing architectures
 # - Ensure you update the target file defined in 'params.jwtTokenFile' before expiration
 
