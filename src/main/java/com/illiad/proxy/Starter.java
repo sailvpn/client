@@ -94,7 +94,7 @@ public class Starter {
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) {
-                        ch.pipeline().addLast(new FrontHandler(bus));
+                        ch.pipeline().addLast("frontHandler", new FrontHandler(bus));
                     }
                 });
 
