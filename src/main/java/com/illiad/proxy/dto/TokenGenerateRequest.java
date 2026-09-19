@@ -6,13 +6,10 @@ import lombok.NoArgsConstructor;
 
 /**
  * Request object for token generation.
- * Supports 3 authentication alternatives:
+ * Supports 2 authentication alternatives:
  * 1. Username + Password (direct authentication)
  * 3. Existing valid token (token renewal/refresh)
- *
  * Only ONE of the three alternatives should be provided.
- * 
- * Optional: sendEmail flag to have the token sent to user's email
  */
 @Data
 @AllArgsConstructor
@@ -28,7 +25,4 @@ public class TokenGenerateRequest {
     // Required for all alternatives
     // Use wrapper Long so we can detect when the client omitted this field in JSON
     private Long expirationMinutes;
-
-    // Optional: send token to user's email
-    private boolean sendEmail = false;
 }
