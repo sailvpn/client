@@ -39,7 +39,7 @@ public class Socks5AckHandler extends SimpleChannelInboundHandler<Socks5CommandR
             // 3. UNLOCK FRONTHANDLER BUFFER FLOW
             // Flushes your earlyBytesBuffer queue down the wire.
             // For plain text (GET/POST), this instantly pumps the initial browser data to the server.
-            FrontHandler frontHandler = frontendCtx.pipeline().get(FrontHandler.class);
+            FrontHandler frontHandler = (FrontHandler) frontendCtx.pipeline().get("frontHandler");
             frontHandler.activateTunnel();
 
             // 4. CONDITIONAL HOOK: SIGNAL ONLY FOR HTTPS CONNECT METHODS
