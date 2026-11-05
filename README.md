@@ -1,4 +1,4 @@
-# Sail Application Management Scripts
+# SailX Application Management Scripts
 
 This repository contains robust production-grade scripts designed to manage a Java JAR application as a background service. It supports starting, stopping, checking operational status, and configuring automatic system boot management.
 
@@ -10,6 +10,44 @@ This repository contains robust production-grade scripts designed to manage a Ja
 * `app.jar` - Java application.
 * `app.log` - Dynamically generated runtime application log file.
 * `app.pid` - Dynamically generated Linux/macOS Process ID tracking file.
+
+---
+
+## 🛠️ Global Prerequisites: Verify & Install Java
+
+Before running the application on any operating system, you must have the **Java Runtime Environment (JRE)** or **Java Development Kit (JDK) version 8 or higher** installed.
+
+### 1. Check if Java is Installed
+Open your terminal (Linux/macOS) or Command Prompt (Windows) and execute:
+```bash
+java -version
+```
+* **If installed:** You will see output detailing the version (e.g., `openjdk version "17.0.x"` or `java version "1.8.0_x"`). You are ready to proceed.
+* **If not installed:** Your system will return an error such as *"command not found"* or *"java is not recognized"*. Follow the installation steps below for your specific platform.
+
+### 2. Linux Installation
+#### Ubuntu / Debian
+```bash
+sudo apt update
+sudo apt install default-jre -y
+```
+#### CentOS / RHEL / Fedora
+```bash
+sudo dnf update
+sudo dnf install java-latest-openjdk -y
+```
+
+### 3. macOS Installation
+The easiest way to install and manage Java on macOS is via **Homebrew**:
+```bash
+brew install openjdk
+sudo ln -sfn $(brew --prefix)/opt/openjdk/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk.jdk
+```
+
+### 4. Windows Installation
+1. **Download:** Visit [Adoptium Eclipse Temurin](https://adoptium.net) and download the `.msi` installer for Windows.
+2. **Install:** Run the installer and **critically ensure** you select the options to **"Add to PATH"** and **"Set JAVA_HOME variable"** (set them to *Will be installed on local hard drive*).
+3. **Apply:** Restart any open Command Prompt or PowerShell windows to reload your system environment variables.
 
 ---
 
@@ -25,15 +63,16 @@ Duplicate or rename `application.properties.txt` to exactly `application.propert
 # ===================================================================
 params.remoteHost=your-server.com
 params.remotePort=443
-params.sni=example.test
+params.sni=your-server.com
 
 # ===================================================================
 # Local Proxy Ports
 # ===================================================================
 # local SOCKS5 port, no username/password needed
-params.localPort=2080
+# UDP is supported via SOCKS5 buiid-in UDP relay
+params.localPort=1080
 # local HTTP/HTTPS port, blind forward
-params.httpPort=9999
+params.httpPort=8080
 params.localHost=127.0.0.1
 
 # ===================================================================
@@ -66,18 +105,20 @@ params.jwtTokenFile=./token.jwt
 params.crypto=JWT
 
 # IMPORTANT in the case of multiple devices, if you set "AUTO" mode on one device. all other devices will be invalidated once that token is updated.
+# comment out or set it to "MANUAL" if you do not want automatic renewal of tokens
 params.tokenMode=AUTO
 
-# you get your username and password from Sail's web portal.
-# if you do not want to expose your username and password. you can go to Sail's web portal, login,
+# you get your username and password from SailX's web portal.
+# if you do not want to expose your username and password. you can go to SailX's web portal, login,
 # and generate a token for all devices you want to use.
 params.username=alice
 params.password=SecurePassword123!
 
 # Token settings (automatic mode)
-params.expireMins=60                    # 60 minutes
-params.renewInterval=10                    # Automatically renew in 10 minutes
-
+# token lifetime, 1 month in minutes
+params.expireMins=43200
+# Automatica renewal cycle, 1 day in minutes
+params.renewInterval=1440
 # ===================================================================
 # OPTION 3: MANUAL MODE (Multiple Devices / Family Sharing)
 # ===================================================================
