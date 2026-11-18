@@ -16,13 +16,15 @@ import java.nio.charset.StandardCharsets;
 public class Socks5AckHandler extends SimpleChannelInboundHandler<Socks5CommandResponse> {
     private final ParamBus bus;
     private final ChannelHandlerContext frontendCtx;
+    private final FrontHandler frontHandler;
 
     /**
      * Clean, decoupled constructor passing only necessary dependencies.
      */
-    public Socks5AckHandler(ChannelHandlerContext frontendCtx, ParamBus bus) {
+    public Socks5AckHandler(ChannelHandlerContext frontendCtx, ParamBus bus, FrontHandler frontHandler) {
         this.frontendCtx = frontendCtx;
         this.bus = bus;
+        this.frontHandler = frontHandler;
     }
 
     @Override
@@ -39,7 +41,6 @@ public class Socks5AckHandler extends SimpleChannelInboundHandler<Socks5CommandR
             // 3. UNLOCK FRONTHANDLER BUFFER FLOW
             // Flushes your earlyBytesBuffer queue down the wire.
             // For plain text (GET/POST), this instantly pumps the initial browser data to the server.
-            FrontHandler frontHandler = (FrontHandler) frontendCtx.pipeline().get("frontHandler");
             frontHandler.activateTunnel();
 
             // 4. CONDITIONAL HOOK: SIGNAL ONLY FOR HTTPS CONNECT METHODS

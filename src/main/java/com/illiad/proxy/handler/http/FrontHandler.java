@@ -328,7 +328,7 @@ public class FrontHandler extends ByteToMessageDecoder {
                                         .addLast(new PseudoResDecoder())
                                         .addLast(bus.namer.generateName(), bus.v5ClientEncoder)
                                         .addLast(bus.namer.generateName(), new V5ClientDecoder(bus))
-                                        .addLast(bus.namer.generateName(), new Socks5AckHandler(ctx, bus))
+                                        .addLast(bus.namer.generateName(), new Socks5AckHandler(ctx, bus, this))
                                         .channel()
                                         .writeAndFlush(socksReq).addListener((ChannelFutureListener) future2 -> {
                                             if (!future2.isSuccess()) {
