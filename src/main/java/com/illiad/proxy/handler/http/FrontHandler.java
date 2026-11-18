@@ -138,7 +138,7 @@ public class FrontHandler extends ByteToMessageDecoder {
         // Safely cache incoming byte frames without altering autoRead state
         if (state == TunnelState.CONNECTING) {
             if (in.readableBytes() > 0) {
-                earlyBytesBuffer.offer(in.readBytes(in.readableBytes()).retain());
+                earlyBytesBuffer.offer(in.readBytes(in.readableBytes()));
                 ctx.fireChannelReadComplete(); // Keeps Netty's stream allocation engine moving
             }
             return;
@@ -238,7 +238,7 @@ public class FrontHandler extends ByteToMessageDecoder {
 
             // 2. Pull out the trailing bytes (the binary TLS Client Hello) and place them FIRST into the FIFO queue
             if (in.readableBytes() > 0) {
-                earlyBytesBuffer.offer(in.readBytes(in.readableBytes()).retain());
+                earlyBytesBuffer.offer(in.readBytes(in.readableBytes()));
             }
         } else {
             // B. PLAINTEXT HTTP TRACK (GET/POST/FETCH):
@@ -280,7 +280,7 @@ public class FrontHandler extends ByteToMessageDecoder {
 
             // 2. Pull out trailing payload bytes (e.g. POST Body details) and place them SECOND into the FIFO queue
             if (in.readableBytes() > 0) {
-                earlyBytesBuffer.offer(in.readBytes(in.readableBytes()).retain());
+                earlyBytesBuffer.offer(in.readBytes(in.readableBytes()));
             }
         }
 

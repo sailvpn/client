@@ -31,31 +31,39 @@ public class Socks5AckHandler extends SimpleChannelInboundHandler<Socks5CommandR
             final Channel backend = ctx.channel();
             final Channel frontend = frontendCtx.channel();
 
-            // 1. RESTRUCTURE BACKEND PIPELINE
-            backend.pipeline().addLast(new RelayHandler(frontend, bus));
-            // 2. REMOVE TRANSIENT HANDSHAKE HANDLERS ONLY FROM BACKEND
-            // Clears your V5ClientDecoder, PseudoResDecoder, etc. via password-prefix
-            cleanupPipeline(backend.pipeline(), bus.namer.getPrefix());
-            // 3. UNLOCK FRONTHANDLER BUFFER FLOW
-            // Flushes your earlyBytesBuffer queue down the wire.
-            // For plain text (GET/POST), this instantly pumps the initial browser data to the server.
             FrontHandler frontHandler = (FrontHandler) frontendCtx.pipeline().get("frontHandler");
-            frontHandler.activateTunnel();
 
-            // 4. CONDITIONAL HOOK: SIGNAL ONLY FOR HTTPS CONNECT METHODS
+            // Guard against race condition where client closed connection during SOCKS handshake
+            if (!frontend.isActive() || frontHandler == null) {
+                backend.close();
+                return;
+            }
+
+            // 1. Restructure backend pipeline
+            backend.pipeline().addLast(new RelayHandler(frontend, bus));
+            cleanupPipeline(backend.pipeline(), bus.namer.getPrefix());
+
+            // 2. For HTTPS CONNECT, send 200 OK *before* unlocking tunnel so client gets 200 first
             if (frontHandler.isConnectMethod()) {
-                // HTTPS Track: Send '200 Connection Established' to kick off browser TLS
                 String establishedMsg = "HTTP/1.1 200 Connection Established\r\n\r\n";
-                ByteBuf ok = frontend.alloc().buffer();
+                ByteBuf ok = frontend.alloc().buffer(establishedMsg.length());
                 ok.writeBytes(establishedMsg.getBytes(StandardCharsets.UTF_8));
                 frontend.writeAndFlush(ok);
             }
-            // Plaintext HTTP (GET/POST/FETCH) Track: Stay silent!
-            // The origin server is already processing your flushed request and will stream back data.
 
+            // 3. Unlock FrontHandler and flush cached early bytes
+            frontHandler.activateTunnel();
 
         } else {
             handleSocksFailure(ctx);
+        }
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        ctx.close();
+        if (frontendCtx.channel().isActive()) {
+            frontendCtx.close();
         }
     }
 
