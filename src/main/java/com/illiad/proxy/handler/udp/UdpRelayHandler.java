@@ -151,8 +151,14 @@ public class UdpRelayHandler extends SimpleChannelInboundHandler<DatagramPacket>
     }
 
     @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        super.channelInactive(ctx);
+    }
+
+    @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        ctx.fireExceptionCaught(cause);
+        // Do NOT call ctx.fireExceptionCaught(cause) here since this is the tail handler
+        ctx.close();
     }
 }
 
