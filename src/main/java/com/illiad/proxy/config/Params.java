@@ -19,14 +19,14 @@ public class Params {
     private String crypto = "SHA_256";
     private int min = 1;
     private int max = 64; // important, maximum value 128
-    String secret = "password";
+    String secret = "xK9#mPq2vL7n$WzR";
 
     private String certPath = "./ca.crt";
     private String jwtTokenFile = "./token.jwt";
 
     // JWT auto-acquisition settings
-    private String username = "imlol";
-    private String password = "illwjzzw001$";
+    private String username = "alice";
+    private String password = "Password123!";
     private Long expireMins = 30L; // 30 days default
 
     // JWT token mode: use TokenMode enum instead of raw string

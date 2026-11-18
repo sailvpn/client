@@ -15,14 +15,14 @@ This repository contains robust production-grade scripts designed to manage a Ja
 
 ## 🛠️ Global Prerequisites: Verify & Install Java
 
-Before running the application on any operating system, you must have the **Java Runtime Environment (JRE)** or **Java Development Kit (JDK) version 8 or higher** installed.
+Before running the application on any operating system, you must have the **Java Runtime Environment (JRE)** or **Java Development Kit (JDK) version 17 or higher** installed.
 
 ### 1. Check if Java is Installed
 Open your terminal (Linux/macOS) or Command Prompt (Windows) and execute:
 ```bash
 java -version
 ```
-* **If installed:** You will see output detailing the version (e.g., `openjdk version "17.0.x"` or `java version "1.8.0_x"`). You are ready to proceed.
+* **If installed:** You will see output detailing the version (e.g., `openjdk version "17.0.x"`). You are ready to proceed.
 * **If not installed:** Your system will return an error such as *"command not found"* or *"java is not recognized"*. Follow the installation steps below for your specific platform.
 
 ### 2. Linux Installation
