@@ -9,12 +9,12 @@ import lombok.Data;
 @Data
 public class Params {
     // Default values are set directly; Spring overrides them if found in a config file
-    private int localPort = 3080;
+    private int localPort = 1080;
     private String localHost = "127.0.0.1";
-    private int httpPort = 9999;
+    private int httpPort = 8080;
     private String remoteHost = "127.0.0.1";
     private String sni = "example.test";
-    private int remotePort = 5001;
+    private int remotePort = 443;
     // crypto name as defined in Cryptos
     private String crypto = "SHA_256";
     private int min = 1;
