@@ -75,7 +75,7 @@ public class Starter {
                     }
                 });
 
-        Channel channel = bs.bind(bus.params.getLocalHost(), bus.params.getLocalPort()).sync().channel();
+        Channel channel = bs.bind(bus.params.getLocalPort()).sync().channel();
         channels.add(channel);
         System.out.println("SOCKS5 server started on port " + bus.params.getLocalPort());
     }
@@ -95,7 +95,7 @@ public class Starter {
                     }
                 });
 
-        Channel channel = bh.bind(bus.params.getLocalHost(), bus.params.getHttpPort()).sync().channel();
+        Channel channel = bh.bind(bus.params.getHttpPort()).sync().channel();
         channels.add(channel);
         System.out.println("HTTP server started on port " + bus.params.getHttpPort());
     }
