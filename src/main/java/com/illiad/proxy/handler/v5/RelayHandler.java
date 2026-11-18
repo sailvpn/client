@@ -19,7 +19,7 @@ public final class RelayHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-        if (relayChannel.isActive() && msg instanceof ByteBuf) {
+        if (relayChannel != null && relayChannel.isActive() && msg instanceof ByteBuf) {
             relayChannel.writeAndFlush(msg);
         } else {
             ReferenceCountUtil.release(msg);
@@ -27,19 +27,21 @@ public final class RelayHandler extends ChannelInboundHandlerAdapter {
     }
 
     @Override
-    public void channelInactive(ChannelHandlerContext ctx) {
-        if (relayChannel.isActive()) {
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        if (relayChannel != null && relayChannel.isActive()) {
             bus.utils.closeOnFlush(relayChannel);
         }
+        super.channelInactive(ctx);
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        ctx.fireExceptionCaught(cause);
+        // Do NOT call ctx.fireExceptionCaught(cause) here since this is the tail handler
         if (relayChannel != null && relayChannel.isActive()) {
             bus.utils.closeOnFlush(relayChannel);
         }
         ctx.close();
     }
 }
+
 
